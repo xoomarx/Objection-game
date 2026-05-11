@@ -2222,7 +2222,19 @@ body.lang-ar .case-stamp { transform: rotate(2deg); }
   .cutscene-title { font-size: 26px; }
   .cutscene-icon { font-size: 54px; }
 }
-#onlineDuelModal {
-  display: none !important;
-}
 
+
+/* === Firebase Online Duel fix === */
+#onlineDuelModal.firebase-online-active {
+  display: flex !important;
+}
+#onlineDuelModal .firebase-note {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--ink-dim);
+  line-height: 1.45;
+}
+#onlineTurnBanner .badge.danger {
+  border-color: var(--red);
+  color: var(--red);
+}
