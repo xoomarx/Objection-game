@@ -2922,10 +2922,10 @@
     hostReady: false, guestReady: false,
     pendingSync: null, _duelStarting: false, _endSeen: false, _applyingRemoteEnd: false,
     _lastSyncId: null,
+    roomCode: null, joinCode: null, transportMode: 'auto',
 
-    _peerCfg: {
-      config: {
-        iceServers: [
+    _peerCfgFor(mode) {
+      const iceServers = [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:stun1.l.google.com:19302' },
           { urls: 'stun:stun.cloudflare.com:3478' },
@@ -2934,8 +2934,17 @@
           { urls: 'turn:openrelay.metered.ca:443',     username: 'openrelayproject', credential: 'openrelayproject' },
           { urls: 'turns:openrelay.metered.ca:443',    username: 'openrelayproject', credential: 'openrelayproject' },
           { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
-        ]
-      }
+      ];
+      return {
+        host: '0.peerjs.com',
+        port: 443,
+        path: '/',
+        secure: true,
+        config: {
+          iceServers: mode === 'relay' ? iceServers.filter(s => String(s.urls).startsWith('turn')) : iceServers,
+          iceTransportPolicy: mode === 'relay' ? 'relay' : 'all',
+        }
+      };
     },
 
     _resetForLobby(isHost) {
@@ -2957,6 +2966,7 @@
       this._endSeen = false;
       this._applyingRemoteEnd = false;
       this._lastSyncId = null;
+      this.transportMode = 'auto';
       const banner = document.getElementById('onlineTurnBanner');
       if (banner) banner.remove();
     },
@@ -2974,15 +2984,17 @@
 
     createRoom() {
       this._resetForLobby(true);
+      this.roomCode = makeRoomCode();
       this.loadPeerJS(() => {
         setRoomStatus('Creating room…', false);
         this.isHost = true;
         this.myRole = 'host';
         try {
-          this.peer = new Peer(undefined, this._peerCfg);
+          this.peer = new Peer(this.roomCode, this._peerCfgFor(this.transportMode));
           this.peer.on('open', id => {
             const shortCode = id;
             showRoomCode(shortCode);
+            wireCopyCode(shortCode);
             setRoomStatus('⏳ Waiting for opponent to join…', false);
             document.getElementById('copyCodeBtn').style.display = '';
             document.getElementById('copyCodeBtn').onclick = () => {
@@ -3007,14 +3019,15 @@
 
     joinRoom(code) {
       this._resetForLobby(false);
+      this.joinCode = code.trim();
       this.loadPeerJS(() => {
         setRoomStatus('Connecting…', false);
         this.isHost = false;
         this.myRole = 'guest';
         try {
-          this.peer = new Peer(undefined, this._peerCfg);
+          this.peer = new Peer(undefined, this._peerCfgFor(this.transportMode));
           this.peer.on('open', () => {
-            this.conn = this.peer.connect(code.trim(), { reliable: true });
+            this.conn = this.peer.connect(this.joinCode, { reliable: true });
             this._setupConn(this.conn);
           });
           this.peer.on('error', err => setRoomStatus('⚠️ Error: ' + err.message + '<br><small>Make sure the room code is correct and the host is still waiting.</small>', false));
@@ -3024,6 +3037,60 @@
       });
     },
 
+    retryRelay() {
+      this.transportMode = 'relay';
+      this.conn = null;
+      setRoomStatus('Retrying with relay mode...', false);
+      try { if (this.peer && !this.peer.destroyed) this.peer.destroy(); } catch(e) {}
+      this.loadPeerJS(() => {
+        if (this.isHost) {
+          setRoomStatus('Re-opening relay room...', false);
+          try {
+            this.peer = new Peer(this.roomCode || makeRoomCode(), this._peerCfgFor('relay'));
+            this.peer.on('open', id => {
+              this.roomCode = id;
+              showRoomCode(id);
+              wireCopyCode(id);
+              setRoomStatus('Relay room ready. Ask your opponent to reconnect with this code.', false);
+            });
+            this.peer.on('connection', conn => {
+              this.conn = conn;
+              this._setupConn(conn);
+            });
+            this.peer.on('error', err => setRoomStatus('Relay error: ' + (err && err.message ? err.message : err), false));
+          } catch(e) {
+            setRoomStatus('Relay error: ' + e.message, false);
+          }
+        } else {
+          if (!this.joinCode) {
+            setRoomStatus('Paste the room code again, then connect.', false);
+            resetOnlineModalControls();
+            return;
+          }
+          setRoomStatus('Connecting through relay...', false);
+          try {
+            this.peer = new Peer(undefined, this._peerCfgFor('relay'));
+            this.peer.on('open', () => {
+              this.conn = this.peer.connect(this.joinCode, { reliable: true });
+              this._setupConn(this.conn);
+            });
+            this.peer.on('error', err => setRoomStatus('Relay error: ' + (err && err.message ? err.message : err), false));
+          } catch(e) {
+            setRoomStatus('Relay error: ' + e.message, false);
+          }
+        }
+      });
+    },
+
+    resetLobby() {
+      const oldJoinCode = this.joinCode;
+      const wasHost = this.isHost;
+      this._resetForLobby(wasHost);
+      resetOnlineModalControls();
+      const input = document.getElementById('roomCodeInput');
+      if (input && oldJoinCode) input.value = oldJoinCode;
+    },
+
     send(data) {
       if (this.conn && this.conn.open) { try { this.conn.send(data); } catch(e) {} }
     },
@@ -3031,14 +3098,7 @@
     _setupConn(conn) {
       const connTimeout = setTimeout(() => {
         if (!conn.open) {
-          setRoomStatus(
-            '⚠️ Connection timed out.<br>' +
-            '<small>This usually means a firewall or router is blocking the connection. ' +
-            'Try: both players on the same WiFi, or both on mobile data. ' +
-            'If it still fails, your network may block peer-to-peer connections.</small>' +
-            '<br><button onclick="document.getElementById(\'joinRoomInput\').classList.remove(\'hidden\');document.getElementById(\'connectRoomBtn\').disabled=false;" style="margin-top:8px">↩ Try Again</button>',
-            false
-          );
+          showConnectionTimeout();
         }
       }, 25000);
 
@@ -3199,6 +3259,60 @@
     const el = document.getElementById('roomCodeDisplay');
     if (el) { el.textContent = code; el.classList.remove('hidden'); }
   }
+  function makeRoomCode() {
+    return 'court-' + Math.random().toString(36).slice(2, 6) + '-' + Date.now().toString(36).slice(-4);
+  }
+  function wireCopyCode(code) {
+    const btn = document.getElementById('copyCodeBtn');
+    if (!btn) return;
+    btn.style.display = '';
+    btn.onclick = () => {
+      const done = () => {
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy Code'; }, 1500);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(done).catch(() => prompt('Copy this code:', code));
+      } else {
+        prompt('Copy this code:', code);
+      }
+    };
+  }
+  function showConnectionTimeout() {
+    setRoomStatus(
+      '<span class="online-connection-dot disconnected"></span> Connection timed out.<br>' +
+      '<small>Your browser reached the room, but direct peer-to-peer traffic was blocked. Try relay mode on both devices.</small>' +
+      '<div class="online-retry-row">' +
+      '<button class="big primary" data-online-retry="relay">Try Relay Mode</button>' +
+      '<button class="big" data-online-retry="reset">Reset</button>' +
+      '</div>',
+      false
+    );
+    const connectBtn = document.getElementById('connectRoomBtn');
+    if (connectBtn) connectBtn.disabled = false;
+  }
+  function resetOnlineModalControls() {
+    const createBtn = document.getElementById('createRoomBtn');
+    const joinBtn = document.getElementById('joinRoomBtn');
+    const connectBtn = document.getElementById('connectRoomBtn');
+    const roomBox = document.getElementById('roomStatusBox');
+    const roomCode = document.getElementById('roomCodeDisplay');
+    const copyBtn = document.getElementById('copyCodeBtn');
+    const stylePick = document.getElementById('onlineStylePick');
+    const readyBtn = document.getElementById('onlineReadyBtn');
+    if (createBtn) createBtn.disabled = false;
+    if (joinBtn) joinBtn.disabled = false;
+    if (connectBtn) connectBtn.disabled = false;
+    if (roomBox) roomBox.classList.add('hidden');
+    if (roomCode) roomCode.classList.add('hidden');
+    if (copyBtn) copyBtn.style.display = 'none';
+    if (stylePick) stylePick.classList.add('hidden');
+    if (readyBtn) {
+      readyBtn.disabled = true;
+      readyBtn.textContent = 'Ready ->';
+    }
+    document.querySelectorAll('#onlineStyleGrid .style-card').forEach(card => card.classList.remove('selected'));
+  }
   function cloneWire(obj) {
     return obj ? JSON.parse(JSON.stringify(obj)) : obj;
   }
@@ -3321,6 +3435,15 @@
   }, true);
 
   document.getElementById('onlineModalClose').addEventListener('click', closeOnlineDuelModal);
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-online-retry]');
+    if (!btn) return;
+    e.preventDefault();
+    const action = btn.dataset.onlineRetry;
+    if (action === 'relay') MP.retryRelay();
+    if (action === 'reset') MP.resetLobby();
+  });
 
   document.getElementById('createRoomBtn').addEventListener('click', () => {
     document.getElementById('createRoomBtn').disabled = true;
