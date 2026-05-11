@@ -3007,8 +3007,9 @@
       if (data.type === 'READY') {
         this.opponentName = data.name;
         this.opponentStyle = data.style;
-        if (this.isHost) { this.hostReady = true; this.guestReady = true; }
-        else { this.guestReady = true; this.hostReady = true; }
+        // Only mark the OTHER player ready — don't touch our own flag
+        if (this.isHost) this.guestReady = true;
+        else this.hostReady = true;
         if (this.hostReady && this.guestReady) this._startOnlineDuel();
       } else if (data.type === 'DUEL_ACTION') {
         // Apply opponent's action locally
@@ -3038,7 +3039,8 @@
     },
 
     _startOnlineDuel() {
-      // Both players have shared their styles — start the duel
+      if (this._duelStarting) return;
+      this._duelStarting = true;
       closeOnlineDuelModal();
       const p1Name  = this.isHost ? this.myName : this.opponentName;
       const p1Style = this.isHost ? this.myStyle : this.opponentStyle;
