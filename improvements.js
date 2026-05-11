@@ -2920,6 +2920,8 @@
     opponentName: null, opponentStyle: null,
     myName: null, myStyle: null,
     hostReady: false, guestReady: false,
+    pendingSync: null, _duelStarting: false, _endSeen: false, _applyingRemoteEnd: false,
+    _lastSyncId: null,
 
     _peerCfg: {
       config: {
@@ -2936,6 +2938,29 @@
       }
     },
 
+    _resetForLobby(isHost) {
+      try { if (this.conn && this.conn.open) this.conn.close(); } catch(e) {}
+      try { if (this.peer && !this.peer.destroyed) this.peer.destroy(); } catch(e) {}
+      this.peer = null;
+      this.conn = null;
+      this.isHost = isHost;
+      this.myRole = isHost ? 'host' : 'guest';
+      this.active = false;
+      this.opponentName = null;
+      this.opponentStyle = null;
+      this.myName = null;
+      this.myStyle = null;
+      this.hostReady = false;
+      this.guestReady = false;
+      this.pendingSync = null;
+      this._duelStarting = false;
+      this._endSeen = false;
+      this._applyingRemoteEnd = false;
+      this._lastSyncId = null;
+      const banner = document.getElementById('onlineTurnBanner');
+      if (banner) banner.remove();
+    },
+
     loadPeerJS(cb) {
       if (window.Peer) { cb(); return; }
       const s = document.createElement('script');
@@ -2948,6 +2973,7 @@
     },
 
     createRoom() {
+      this._resetForLobby(true);
       this.loadPeerJS(() => {
         setRoomStatus('Creating room…', false);
         this.isHost = true;
@@ -2980,6 +3006,7 @@
     },
 
     joinRoom(code) {
+      this._resetForLobby(false);
       this.loadPeerJS(() => {
         setRoomStatus('Connecting…', false);
         this.isHost = false;
@@ -3053,16 +3080,49 @@
         } catch(e) {}
         updateOnlineTurnBanner();
       } else if (data.type === 'SYNC') {
-        // Both sides apply SYNC — whichever player just acted sends the truth
-        if (data.duel) {
-          try {
-            Object.assign(S.duel, data.duel);
-            S.court = Object.assign(S.court || {}, data.court || {});
-            Game.renderDuel && Game.renderDuel();
-          } catch(e) {}
-        }
+        this._applySync(data);
         updateOnlineTurnBanner();
+      } else if (data.type === 'DUEL_END') {
+        this._finishRemoteDuel(data.winnerName);
       }
+    },
+
+    _applySync(data) {
+      if (!data || !data.duel) return false;
+      this.pendingSync = data;
+      if (!S.duel) return false;
+      if (data.syncId && data.syncId === this._lastSyncId) return true;
+      if (data.syncId) this._lastSyncId = data.syncId;
+      try {
+        S.duel = cloneWire(data.duel);
+        if (data.court) S.court = cloneWire(data.court);
+        Game.renderDuel && Game.renderDuel();
+        if (data.log && data.log.text) {
+          UI.log('courtLog', data.log.text, data.log.kind || '');
+        }
+        this.pendingSync = null;
+        return true;
+      } catch(e) {
+        return false;
+      }
+    },
+
+    _sendSync(extra) {
+      if (!S.duel) return;
+      this.send(Object.assign({
+        type: 'SYNC',
+        syncId: Date.now() + ':' + Math.random().toString(36).slice(2),
+        duel: cloneWire(S.duel),
+        court: cloneWire(S.court),
+        log: extra && extra.initial ? null : lastCourtLog(),
+      }, extra || {}));
+    },
+
+    _finishRemoteDuel(winnerName) {
+      if (!winnerName || this._endSeen) return;
+      this._applyingRemoteEnd = true;
+      try { Game.endDuel && Game.endDuel(winnerName); }
+      finally { this._applyingRemoteEnd = false; }
     },
 
     _startOnlineDuel() {
@@ -3074,28 +3134,43 @@
       const p2Name  = this.isHost ? this.opponentName : this.myName;
       const p2Style = this.isHost ? this.opponentStyle : this.myStyle;
 
-      // Set up duel UI inputs and trigger startDuel
+      if (!p1Style || !p2Style || !STYLES[p1Style] || !STYLES[p2Style]) {
+        this._duelStarting = false;
+        setRoomStatus('Could not start: both players need a valid style.', false);
+        openOnlineDuelModal();
+        return;
+      }
+
+      try { Game.startDuelSetup && Game.startDuelSetup(); } catch(e) {}
+
+      // Set up duel UI inputs and the selection object Game.startDuel actually reads.
       const d1Name = document.getElementById('d1Name');
       const d2Name = document.getElementById('d2Name');
-      if (d1Name) d1Name.value = p1Name;
-      if (d2Name) d2Name.value = p2Name;
+      if (d1Name) d1Name.value = p1Name || 'Host';
+      if (d2Name) d2Name.value = p2Name || 'Guest';
+      S.duelSel = { p1: p1Style, p2: p2Style };
+      S.duelSetup = { p1: p1Style, p2: p2Style };
 
-      // Select styles
       try {
-        document.querySelectorAll('#d1Styles .style-card').forEach(el => el.classList.toggle('selected', el.dataset.style === p1Style));
-        document.querySelectorAll('#d2Styles .style-card').forEach(el => el.classList.toggle('selected', el.dataset.style === p2Style));
-        if (!S.duelSetup) S.duelSetup = { p1: null, p2: null };
-        S.duelSetup = { p1: p1Style, p2: p2Style };
+        markDuelStyle('d1Styles', p1Style);
+        markDuelStyle('d2Styles', p2Style);
         const startBtn = document.getElementById('duelStart');
         if (startBtn) startBtn.disabled = false;
       } catch(e) {}
 
-      // Navigate to duel setup then start
-      UI.switchTo && UI.switchTo('duel');
       setTimeout(() => {
-        try { Game.startDuel && Game.startDuel(); } catch(e) {}
-        this.active = true;
-        updateOnlineTurnBanner();
+        try {
+          Game.startDuel && Game.startDuel();
+          this.active = true;
+          if (this.isHost) this._sendSync({ initial: true });
+          else if (this.pendingSync) this._applySync(this.pendingSync);
+          updateOnlineTurnBanner();
+        } catch(e) {
+          this.active = false;
+          this._duelStarting = false;
+          setRoomStatus('Could not start online duel: ' + e.message, false);
+          openOnlineDuelModal();
+        }
       }, 200);
     },
 
@@ -3118,11 +3193,29 @@
     const text = document.getElementById('roomStatusText');
     if (box) box.classList.remove('hidden');
     if (text) text.innerHTML = html;
-    _ = connected; // suppress lint
+    void connected;
   }
   function showRoomCode(code) {
     const el = document.getElementById('roomCodeDisplay');
     if (el) { el.textContent = code; el.classList.remove('hidden'); }
+  }
+  function cloneWire(obj) {
+    return obj ? JSON.parse(JSON.stringify(obj)) : obj;
+  }
+  function lastCourtLog() {
+    const box = document.getElementById('courtLog');
+    const entry = box && box.lastElementChild;
+    if (!entry) return null;
+    const kind = Array.from(entry.classList).filter(c => c !== 'entry').join(' ');
+    return { text: entry.textContent || '', kind };
+  }
+  function markDuelStyle(targetId, styleId) {
+    const cards = document.querySelectorAll(`#${targetId} .style-card`);
+    const styles = typeof STYLES !== 'undefined' ? Object.values(STYLES) : [];
+    cards.forEach((el, idx) => {
+      const currentStyle = el.dataset.style || (styles[idx] && styles[idx].id);
+      el.classList.toggle('selected', currentStyle === styleId);
+    });
   }
   function updateOnlineTurnBanner() {
     if (!MP.active || !S.duel) return;
@@ -3139,12 +3232,22 @@
       banner.className = 'online-turn-banner online-your-turn';
       banner.innerHTML = `<span class="online-connection-dot"></span>${isAr ? 'دورك — خطوتك الآن' : 'Your Turn — Make your move'}`;
       // Enable buttons
-      document.querySelectorAll('#courtActions button, #evidenceRow button').forEach(b => { b.disabled = false; });
+      document.querySelectorAll('#courtActions button').forEach(b => { b.disabled = false; });
+      document.querySelectorAll('#evidenceRow .ev-card').forEach(card => {
+        card.style.pointerEvents = '';
+        card.style.opacity = '';
+        card.removeAttribute('aria-disabled');
+      });
     } else {
       banner.className = 'online-turn-banner';
       banner.innerHTML = `<span class="online-connection-dot"></span>${isAr ? 'دور الخصم — انتظر…' : 'Opponent\'s Turn — Waiting…'}`;
       // Disable our buttons
-      document.querySelectorAll('#courtActions button, #evidenceRow button').forEach(b => { b.disabled = true; });
+      document.querySelectorAll('#courtActions button').forEach(b => { b.disabled = true; });
+      document.querySelectorAll('#evidenceRow .ev-card').forEach(card => {
+        card.style.pointerEvents = 'none';
+        card.style.opacity = '0.6';
+        card.setAttribute('aria-disabled', 'true');
+      });
     }
   }
 
@@ -3155,8 +3258,7 @@
       if (MP.active && !MP.isMyTurn()) return; // block if not your turn
       _origDuelAction(action);
       if (MP.active) {
-        MP.send({ type: 'DUEL_ACTION', action });
-        if (MP.isHost) MP.send({ type: 'SYNC', duel: S.duel, court: S.court });
+        MP._sendSync({ action });
         updateOnlineTurnBanner();
       }
     };
@@ -3167,9 +3269,25 @@
       if (MP.active && !MP.isMyTurn()) return;
       _origDuelPresent(idx);
       if (MP.active) {
-        MP.send({ type: 'DUEL_ACTION', action: 'duel_present', idx });
-        if (MP.isHost) MP.send({ type: 'SYNC', duel: S.duel, court: S.court });
+        MP._sendSync({ action: 'duel_present', idx });
         updateOnlineTurnBanner();
+      }
+    };
+  }
+  const _origEndDuelOnline = Game.endDuel && Game.endDuel.bind(Game);
+  if (_origEndDuelOnline) {
+    Game.endDuel = function (winnerName) {
+      const online = MP.active;
+      if (online && MP._endSeen) return;
+      if (online) MP._endSeen = true;
+      _origEndDuelOnline(winnerName);
+      if (online && !MP._applyingRemoteEnd) {
+        MP.send({ type: 'DUEL_END', winnerName });
+      }
+      if (online) {
+        MP.active = false;
+        const banner = document.getElementById('onlineTurnBanner');
+        if (banner) banner.remove();
       }
     };
   }
