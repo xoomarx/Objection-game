@@ -1568,7 +1568,7 @@ button[data-act="toggle-time-pressure"] {
 
 /* ===== Statement Box — Testimony Display ===== */
 
-/* Statement counter / header */
+/* Statement counter / header — sits inside .statement (paper bg, dark text) */
 .stmt-counter {
   display: flex;
   justify-content: space-between;
@@ -1576,17 +1576,17 @@ button[data-act="toggle-time-pressure"] {
   font-size: 10px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--ink-dim);
-  border-bottom: 1px solid rgba(212,168,44,0.2);
+  color: #6b5030;
+  border-bottom: 1px solid rgba(90,62,16,0.25);
   padding-bottom: 5px;
   margin-bottom: 6px;
 }
 .stmt-num {
-  color: var(--gold);
+  color: #8b5e1a;
   font-weight: bold;
 }
 .stmt-resolved {
-  color: #5aaa4a;
+  color: #1e6e10;
   font-size: 9px;
 }
 
@@ -1602,21 +1602,23 @@ button[data-act="toggle-time-pressure"] {
 }
 
 /* Make the statement quote text slightly larger and more readable */
+/* NOTE: .statement has background:var(--paper) and color:var(--bg-0),
+   so we must use dark ink here — NOT --ink (which is light) */
 .statement .quote {
   font-size: 15px;
   line-height: 1.55;
   font-style: italic;
-  color: var(--ink);
+  color: var(--bg-0);
   letter-spacing: 0.3px;
 }
 
-/* Who-is-talking label — bolder, colored */
+/* Who-is-talking label — bolder, dark */
 .statement .who {
   font-size: 11px;
   font-weight: bold;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--gold);
+  color: #5a3e10;
   margin-bottom: 4px;
 }
 
@@ -1637,4 +1639,173 @@ button[data-act="toggle-time-pressure"] {
   .statement .quote { font-size: 13px; }
   #courtLog .entry.log-speech { font-size: 12px; }
   #courtLog .entry.log-speech::before { display: none; }
+}
+
+/* Fix: move "VOICE ENABLED" label to bottom so it doesn't overlap testimony */
+#statementBox::after {
+  top: auto !important;
+  bottom: 4px !important;
+  right: 8px !important;
+  font-size: 8px !important;
+  opacity: 0.22 !important;
+  pointer-events: none;
+}
+
+/* ===== Settlement UI Overhaul ===== */
+#negotiation { max-width: 680px; margin: 0 auto; }
+
+.negot-status {
+  display: none; /* replaced by our custom status block */
+}
+.negot-panel {
+  background: var(--bg-1);
+  border: 1px solid rgba(212,168,44,0.3);
+  border-radius: 6px;
+  padding: 14px 18px;
+  margin-bottom: 14px;
+}
+.negot-opponent-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.negot-avatar {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  background: var(--bg-2);
+  border: 2px solid rgba(212,168,44,0.4);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.negot-opp-info { flex: 1; }
+.negot-opp-name { font-weight: bold; font-size: 13px; color: var(--gold); letter-spacing: 0.5px; }
+.negot-opp-type { font-size: 11px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 1px; }
+.negot-offer-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.negot-offer-amount {
+  font-size: 26px; font-weight: bold; color: var(--gold);
+  font-family: 'Courier New', monospace;
+  text-shadow: 0 0 12px rgba(212,168,44,0.3);
+  transition: color .3s, transform .2s;
+}
+.negot-offer-amount.changed { animation: offerPop .35s ease-out; }
+@keyframes offerPop {
+  0% { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+.negot-rounds-pips { display: flex; gap: 5px; }
+.negot-pip {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: rgba(212,168,44,0.2);
+  border: 1px solid rgba(212,168,44,0.4);
+  transition: background .3s;
+}
+.negot-pip.active { background: var(--gold); }
+
+/* Mood bar */
+.negot-mood-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.negot-mood-label { font-size: 11px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 1px; width: 70px; flex-shrink: 0; }
+.negot-mood-bar-wrap { flex: 1; height: 8px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
+.negot-mood-bar-fill { height: 100%; border-radius: 4px; transition: width .5s ease, background .5s ease; }
+.negot-mood-value { font-size: 12px; font-weight: bold; min-width: 60px; text-align: right; }
+
+/* Personality flavor text */
+.negot-flavor {
+  font-size: 12px; color: var(--ink-dim); font-style: italic;
+  border-left: 3px solid rgba(212,168,44,0.3);
+  padding-left: 10px; margin-top: 8px;
+  line-height: 1.5;
+}
+
+/* ===== Career Profile Overlay ===== */
+#careerProfileOverlay {
+  position: fixed; inset: 0;
+  background: rgba(13,8,24,0.92);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity .4s ease;
+}
+#careerProfileOverlay.visible {
+  opacity: 1; pointer-events: all;
+}
+.career-profile-card {
+  background: var(--bg-1);
+  border: 1px solid rgba(212,168,44,0.4);
+  border-radius: 10px;
+  padding: 28px 32px;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.7);
+}
+.career-profile-card h2 {
+  font-size: 13px; letter-spacing: 3px; text-transform: uppercase;
+  color: var(--ink-dim); margin: 0 0 18px 0;
+}
+.career-rank-display {
+  text-align: center; margin-bottom: 20px;
+}
+.career-rank-badge-large {
+  font-size: 32px; display: block; margin-bottom: 4px;
+}
+.career-rank-title {
+  font-size: 17px; font-weight: bold; color: var(--gold);
+  letter-spacing: 1px;
+}
+.career-stats-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px; margin-bottom: 18px;
+}
+.career-stat {
+  background: rgba(255,255,255,0.04);
+  border-radius: 5px; padding: 8px 12px;
+}
+.career-stat-label {
+  font-size: 10px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 1px;
+}
+.career-stat-value {
+  font-size: 18px; font-weight: bold; color: var(--gold); font-family: 'Courier New', monospace;
+}
+.career-last-case {
+  background: rgba(212,168,44,0.06);
+  border: 1px solid rgba(212,168,44,0.2);
+  border-radius: 5px; padding: 10px 14px; margin-bottom: 16px;
+  font-size: 13px; color: var(--ink);
+}
+.career-last-case .case-result-tag {
+  display: inline-block;
+  padding: 2px 8px; border-radius: 3px; font-size: 11px;
+  font-weight: bold; letter-spacing: 1px; margin-bottom: 6px;
+}
+.case-result-tag.won { background: rgba(90,170,74,0.2); color: #5aaa4a; }
+.case-result-tag.lost { background: rgba(212,74,58,0.2); color: #d44a3a; }
+.case-result-tag.settle { background: rgba(212,168,44,0.2); color: var(--gold); }
+.career-profile-close {
+  width: 100%; padding: 11px;
+  background: var(--gold); color: var(--bg-0);
+  font-weight: bold; font-size: 13px; letter-spacing: 1px;
+  border: none; border-radius: 5px; cursor: pointer;
+  transition: filter .15s;
+}
+.career-profile-close:hover { filter: brightness(1.1); }
+
+/* Menu personalization banner */
+.menu-career-banner {
+  background: rgba(212,168,44,0.06);
+  border: 1px solid rgba(212,168,44,0.2);
+  border-radius: 6px; padding: 10px 16px;
+  margin-bottom: 14px; text-align: center;
+  font-size: 13px; color: var(--ink-dim);
+  animation: fadeInDown .4s ease;
+}
+.menu-career-banner strong { color: var(--gold); }
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
 }

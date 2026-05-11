@@ -177,7 +177,7 @@
     for (let i = 0; i < proceduralCount; i++) {
       try { procedural.push(Game.makeRandomCase()); } catch (e) {}
     }
-    const deck = fixedShuffled.concat(procedural).sort((a, b) => (a.diff || 1) - (b.diff || 1));
+    const deck = shuffle(fixedShuffled.concat(procedural));
     CASES.length = 0;
     deck.forEach(c => CASES.push(c));
     try { I18N.translateData(); } catch (e) {}
@@ -1147,8 +1147,80 @@
   Game.startDailyCase = function () {
     try {
       const rng = seededRandom(dailySeed());
-      const themes = (typeof RANDOM_THEMES !== 'undefined') ? RANDOM_THEMES : [];
-      if (!themes.length) { alert('Daily case unavailable — no themes loaded.'); return; }
+      // Self-contained themes — no dependency on RANDOM_THEMES global
+      const themes = [
+        { type: 'fraud', titles: ['The Forged Ledger', 'Paper Ghost', 'The Silent Partner', 'Off the Books'],
+          intros: ['Millions moved through shell accounts. Your client signed the transfers. But someone else held the pen.', 'A business partner vanished with the books. Now your client faces the audit alone.'],
+          stmtTemplates: [
+            { text: 'My client had no knowledge of the fraudulent transfers.', obj: null },
+            { text: 'The accounting discrepancy was an honest clerical error.', obj: 'speculation' },
+            { text: 'All transactions were approved by both directors.', obj: 'hearsay' },
+            { text: 'The missing funds were reinvested as per standard procedure.', obj: null },
+            { text: 'No personal benefit was derived from these transactions.', obj: 'speculation' },
+          ],
+          evidencePool: ['bank_transfer','email_thread','internal_memo','phone_record','signed_contract','expert_report','witness_statement','text_messages'] },
+        { type: 'murder', titles: ['The Last Call', 'Reasonable Doubt', 'No Witness Left', 'The Alibi'],
+          intros: ['A man is found dead. Your client was the last to see him. The timeline is everything.', 'Three witnesses. Two contradict each other. One is lying — but which one?'],
+          stmtTemplates: [
+            { text: 'My client left the premises before 10 PM as confirmed by security.', obj: null },
+            { text: 'No forensic evidence links my client to the scene.', obj: null },
+            { text: 'The witness identification was made under duress.', obj: 'hearsay' },
+            { text: 'My client had no motive to harm the victim.', obj: 'speculation' },
+            { text: 'The timeline presented by the prosecution is impossible.', obj: null },
+          ],
+          evidencePool: ['cctv_timestamp','phone_record','expert_report','witness_statement','text_messages','access_badge_log','police_report','email_thread'] },
+        { type: 'kidnapping', titles: ['The Vanished Heir', 'No Ransom, No Trace', 'Forty-Eight Hours', 'The Empty Cradle'],
+          intros: ['A child gone. A family fortune at stake. Your client says they were home. The phone records say otherwise.', 'A businessman disappears for two days, then walks back in. Everyone is lying about something.'],
+          stmtTemplates: [
+            { text: 'My client was home the entire weekend.', obj: null },
+            { text: 'No ransom communication ever reached us.', obj: 'hearsay' },
+            { text: 'There was no financial motive whatsoever.', obj: 'speculation' },
+            { text: 'No one matching that description was seen with the victim.', obj: null },
+            { text: 'No threats were ever made — the relationship was friendly.', obj: 'hearsay' },
+          ],
+          evidencePool: ['phone_record','cctv_timestamp','text_messages','bank_transfer','witness_statement','access_badge_log','expert_report','police_report'] },
+        { type: 'cybercrime', titles: ['Zero Day', 'Ghost in the Server', 'The Encrypted Confession', 'Backdoor Politics'],
+          intros: ['A breach. A leak. Your client is accused of selling customer data to the highest bidder.', 'Ten million in crypto walked out of a hedge fund overnight. The trail leads to one keyboard.'],
+          stmtTemplates: [
+            { text: 'No unauthorized access originated from my client\'s account.', obj: null },
+            { text: 'The login records were tampered with after the fact.', obj: 'speculation' },
+            { text: 'No credentials were shared outside the security protocol.', obj: 'hearsay' },
+            { text: 'My client has no technical ability to execute such an attack.', obj: null },
+            { text: 'No funds reached any account connected to the defendant.', obj: null },
+          ],
+          evidencePool: ['access_badge_log','bank_transfer','email_thread','text_messages','expert_report','internal_memo','phone_record','whistle_file'] },
+        { type: 'corruption', titles: ['The Envelope', 'The Tender Fix', 'Above Suspicion', 'Public Trust'],
+          intros: ['A city official steered a $40 million contract to a shell company. The paperwork is pristine. The payments are not.', 'A customs inspector is accused of clearing containers without inspection — for a fee.'],
+          stmtTemplates: [
+            { text: 'Every contract decision was made through official channels.', obj: null },
+            { text: 'No paper trail connects any payment to my client.', obj: 'speculation' },
+            { text: 'The bidding process was reviewed and approved at every stage.', obj: null },
+            { text: 'The transfer was a personal gift and fully disclosed.', obj: 'hearsay' },
+            { text: 'My client acted within the discretionary authority of the office.', obj: null },
+          ],
+          evidencePool: ['bank_transfer','internal_memo','email_thread','witness_statement','phone_record','signed_contract','expert_report','whistle_file'] },
+        { type: 'arson', titles: ['Burn Order', 'The Insurance Payout', 'Match and Motive', 'Smoke Signal'],
+          intros: ['A warehouse went up two weeks before the policy expired. Faulty wiring tells a different story.', 'A family home burned to the foundation. The only person who escaped unhurt is on trial.'],
+          stmtTemplates: [
+            { text: 'My client was nowhere near the property that night.', obj: null },
+            { text: 'The fire was clearly an accidental electrical fault.', obj: 'speculation' },
+            { text: 'No accelerant was found at the scene.', obj: null },
+            { text: 'The insurance claim was filed in good faith.', obj: 'hearsay' },
+            { text: 'No motive existed for setting the fire deliberately.', obj: 'speculation' },
+          ],
+          evidencePool: ['expert_report','cctv_timestamp','police_report','phone_record','bank_transfer','witness_statement','internal_memo','text_messages'] },
+        { type: 'espionage', titles: ['The Stolen Deck', 'Trade Secret', 'The Competitor Leak', 'IP Theft'],
+          intros: ['A star engineer joins a direct competitor on Monday. The rival\'s product shipped six weeks later.', 'A pharmaceutical firm\'s new molecule appears in a rival\'s patent filed one month after an employee quit.'],
+          stmtTemplates: [
+            { text: 'My client took no proprietary data upon leaving.', obj: null },
+            { text: 'The product similarity is pure coincidence of parallel development.', obj: 'speculation' },
+            { text: 'No company files were accessed outside normal business hours.', obj: null },
+            { text: 'My client\'s new employer developed their solution independently.', obj: 'hearsay' },
+            { text: 'All IP at the previous firm was protected under existing NDAs.', obj: null },
+          ],
+          evidencePool: ['access_badge_log','email_thread','internal_memo','expert_report','phone_record','signed_contract','whistle_file','text_messages'] },
+      ];
+      if (!themes.length) { alert('Daily case unavailable.'); return; }
       const themeIdx = Math.floor(rng() * themes.length);
       const theme = themes[themeIdx];
 
@@ -1592,7 +1664,14 @@
     const idx = c.statementIdx || 0;
     const current = Math.min(idx + 1, total);
     const resolved = c.statementsResolved || 0;
-    counter.innerHTML = `<span class="stmt-num">TESTIMONY ${current} / ${total}</span><span class="stmt-resolved">${resolved} broken</span>`;
+    const isAr = typeof I18N !== 'undefined' && I18N.ar();
+    if (isAr) {
+      counter.setAttribute('dir', 'rtl');
+      counter.innerHTML = `<span class="stmt-resolved">${resolved} مكسور</span><span class="stmt-num">شهادة ${current} / ${total}</span>`;
+    } else {
+      counter.removeAttribute('dir');
+      counter.innerHTML = `<span class="stmt-num">TESTIMONY ${current} / ${total}</span><span class="stmt-resolved">${resolved} broken</span>`;
+    }
 
     // Typewriter effect on new statement
     const stmtEl = document.getElementById('statementText');
@@ -1645,5 +1724,320 @@
     document.head.appendChild(s);
   })();
 
-  console.log('[Suits Improvements v2] loaded — voice delay, dialogue log mode, statement counter, 11 themes, witness moods, press, traits, last-chance, combo chains, daily case, verdict, career ranks, time pressure, random case integrated into campaign.');
+  /* ============================================================
+   * 22) VISIT HANDLERS — new locations (crimescene, speakeasy, archive)
+   * These IDs were added in section 4 but had no clue handlers.
+   * Now they generate real, contextual clue text.
+   * ============================================================ */
+  const _origVisitFinal = Game.visit.bind(Game);
+  Game.visit = function (loc) {
+    const id = loc.id;
+    // Handle our new location IDs before passing to original
+    if (id === 'crimescene' || id === 'speakeasy' || id === 'archive') {
+      S.invest.visited[id] = true;
+      S.invest.left--;
+      try { Snd.paper && Snd.paper(); } catch(e) {}
+      const c = S.caseData;
+      const r = Math.random();
+      let clue;
+
+      if (id === 'crimescene') {
+        const unrev = c.statements.filter((_, i) => !S.invest.revealed.includes(i));
+        if (unrev.length > 0 && r < 0.7) {
+          const idx = c.statements.indexOf(unrev[Math.floor(Math.random() * unrev.length)]);
+          S.invest.revealed.push(idx);
+          clue = { text: `🔦 Crime Scene [Physical]: Your eyes catch what the police missed — "${c.statements[idx].hint}"`, type: 'physical', icon: '🔦' };
+        } else if (r < 0.85) {
+          clue = { text: '🔦 Crime Scene [Secured]: No new angles, but you lock down the physical evidence before the prosecution can spin it. Focus +3 on entry.', type: 'physical', icon: '🔦' };
+          if (S.court) S.court.focus = Math.min(100, (S.court.focus || 0) + 3);
+        } else {
+          clue = { text: '🔦 Crime Scene [Compromised]: Opposing counsel was here first. Expect them to cite scene contamination.', type: 'risk', icon: '⚠️' };
+          S.invest.coldOpp = true;
+        }
+
+      } else if (id === 'speakeasy') {
+        const unrev = c.statements.filter((_, i) => !S.invest.revealed.includes(i));
+        if (r < 0.55 && unrev.length > 0) {
+          const idx = c.statements.indexOf(unrev[Math.floor(Math.random() * unrev.length)]);
+          S.invest.revealed.push(idx);
+          const second = unrev.find((_, ii) => ii > 0);
+          if (second) {
+            const idx2 = c.statements.indexOf(second);
+            if (!S.invest.revealed.includes(idx2)) S.invest.revealed.push(idx2);
+            clue = { text: `🥃 Underground Bar [Double Burn]: Your contact whispers two angles — "${c.statements[idx].hint}" and "${c.statements[idx2].hint}"`, type: 'intel', icon: '🥃' };
+          } else {
+            clue = { text: `🥃 Underground Bar [Intel]: A contact who would never come forward burns this for you — "${c.statements[idx].hint}"`, type: 'intel', icon: '🥃' };
+          }
+        } else if (r < 0.75) {
+          clue = { text: '🥃 Underground Bar [Loyalty]: Nothing fresh, but the contact owes you. Jury sympathy angle noted — Court entry bonus incoming.', type: 'intel', icon: '🥃' };
+          if (S.court) S.court.jury = Math.min(50, (S.court.jury || 0) + 5);
+        } else {
+          clue = { text: '🥃 Underground Bar [Burned]: The meet was watched. Opposing counsel will know you\'re fishing. Expect aggression early.', type: 'risk', icon: '⚠️' };
+          S.invest.coldOpp = true;
+        }
+
+      } else if (id === 'archive') {
+        if (r < 0.65) {
+          const unrev = c.statements.filter((_, i) => !S.invest.revealed.includes(i));
+          if (unrev.length > 0) {
+            const idx = c.statements.indexOf(unrev[Math.floor(Math.random() * unrev.length)]);
+            S.invest.revealed.push(idx);
+            clue = { text: `🗞️ Press Archives [Pattern]: An old headline surfaces a pattern the prosecution buried — "${c.statements[idx].hint}"`, type: 'precedent', icon: '🗞️' };
+          } else {
+            clue = { text: '🗞️ Press Archives [Precedent]: Hours in the stacks. Legal Skill refined. +1 Legal Skill.', type: 'precedent', icon: '🗞️' };
+            if (S.player) S.player.stats.legalSkill = Math.min(10, S.player.stats.legalSkill + 1);
+          }
+        } else {
+          clue = { text: '🗞️ Press Archives [Timing]: The story was planted. Someone fed the press at a very specific moment. You now know why.', type: 'precedent', icon: '🗞️' };
+          if (S.court) S.court.judge = Math.min(100, (S.court.judge || 0) + 5);
+        }
+      }
+
+      S.invest.clues.push(clue);
+      try { this.renderInvestigation(); } catch(e) {}
+      if (S.invest.left === 0) {
+        try { this.renderInvestigation(); } catch(e) {}
+      }
+      return;
+    }
+    // Fall through to original for office, corp, records, crime_scene, informant
+    _origVisitFinal(loc);
+  };
+
+  /* ============================================================
+   * 23) PRESERVE S.PLAYER THROUGH MENU (fixes The Chambers)
+   * game.js toMenu() sets S.player = null, breaking the shop
+   * and making the menu feel anonymous after finishing a case.
+   * We save the player and restore it after the original runs.
+   * ============================================================ */
+  let _preservedPlayer = null;
+
+  const _origToMenuPreserve = Game.toMenu.bind(Game);
+  Game.toMenu = function () {
+    if (S.player) _preservedPlayer = S.player;
+    _origToMenuPreserve();
+    // Restore player so The Chambers and topbar still work
+    if (_preservedPlayer) {
+      S.player = _preservedPlayer;
+      // Refresh topbar with career info
+      try {
+        if (S.player) {
+          const rank = getCareerRank(S.player.reputation || 0);
+          const repEl = document.getElementById('repLabel');
+          if (repEl) repEl.textContent = `${rank.badge} ${rank.title}`;
+          if (UI.refreshTopBar) UI.refreshTopBar();
+        }
+      } catch(e) {}
+      // Inject career banner into menu if there is one
+      setTimeout(() => {
+        try { injectMenuCareerBanner(); } catch(e) {}
+      }, 150);
+    }
+  };
+
+  function injectMenuCareerBanner() {
+    const menuEl = document.getElementById('menu');
+    if (!menuEl || !_preservedPlayer) return;
+    let banner = menuEl.querySelector('.menu-career-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.className = 'menu-career-banner';
+      const col = menuEl.querySelector('.btn-col.menu-buttons');
+      if (col) menuEl.insertBefore(banner, col);
+      else menuEl.insertBefore(banner, menuEl.firstChild);
+    }
+    const p = _preservedPlayer;
+    const rank = getCareerRank(p.reputation || 0);
+    banner.innerHTML = `<strong>${rank.badge} ${p.name}</strong> &nbsp;•&nbsp; ${rank.title} &nbsp;•&nbsp; ${p.wins || 0} wins &nbsp;•&nbsp; $${(p.money || 0).toLocaleString()} &nbsp;•&nbsp; Rep ${p.reputation || 0}`;
+  }
+
+  /* ============================================================
+   * 24) SETTLEMENT UI OVERHAUL
+   * Replaces the plain negot-status block with a visual mood bar,
+   * animated offer display, round pips, and personality flavour.
+   * ============================================================ */
+  const PERSONALITY_ICONS = { charming: '😏', technical: '📐', intimidating: '😤', slippery: '🃏' };
+  const PERSONALITY_LABELS = { charming: 'Charming', technical: 'Technical', intimidating: 'Intimidating', slippery: 'Slippery' };
+
+  function moodColor(mood) {
+    if (mood >= 70) return '#5aaa4a';
+    if (mood >= 55) return '#8bbf40';
+    if (mood >= 40) return '#d4a82c';
+    if (mood >= 20) return '#d4703a';
+    return '#d44a3a';
+  }
+  function moodLabel(mood) {
+    if (mood >= 70) return 'Receptive';
+    if (mood >= 55) return 'Open';
+    if (mood >= 40) return 'Neutral';
+    if (mood >= 20) return 'Tense';
+    return 'Hostile';
+  }
+
+  let _lastOfferForAnim = 0;
+
+  const _origRenderNegotUI = Game.renderNegot.bind(Game);
+  Game.renderNegot = function () {
+    _origRenderNegotUI();
+    const n = S.negot;
+    if (!n || !S.caseData) return;
+
+    // Inject panel if not present
+    let panel = document.getElementById('negotPanel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'negotPanel';
+      panel.className = 'negot-panel';
+      const statusEl = document.querySelector('.negot-status');
+      if (statusEl && statusEl.parentNode) {
+        statusEl.parentNode.insertBefore(panel, statusEl);
+      }
+    }
+
+    const opp = S.caseData.opponent;
+    const icon = PERSONALITY_ICONS[opp.personality] || '⚖️';
+    const ptypLabel = PERSONALITY_LABELS[opp.personality] || opp.personality;
+    const mc = moodColor(n.mood);
+    const ml = moodLabel(n.mood);
+    const moodPct = n.mood;
+    const offerChanged = n.offer !== _lastOfferForAnim;
+    _lastOfferForAnim = n.offer;
+
+    // Build round pips
+    let pips = '';
+    const totalRounds = 3;
+    for (let i = 0; i < totalRounds; i++) {
+      pips += `<div class="negot-pip${i < n.rounds ? ' active' : ''}"></div>`;
+    }
+
+    const flavorTexts = {
+      charming: '"I like you, counselor. Don\'t make me stop."',
+      technical: '"I have precedent. I have precedent for everything."',
+      intimidating: '"You have three rounds. I\'ve done this in one."',
+      slippery: '"Every offer I make comes with conditions you\'ll read later."',
+    };
+    const flavor = flavorTexts[opp.personality] || '"Make it quick."';
+
+    panel.innerHTML = `
+      <div class="negot-opponent-header">
+        <div class="negot-avatar">${icon}</div>
+        <div class="negot-opp-info">
+          <div class="negot-opp-name">${opp.name}</div>
+          <div class="negot-opp-type">${ptypLabel} Counsel</div>
+        </div>
+        <div class="negot-rounds-pips">${pips}</div>
+      </div>
+      <div class="negot-offer-row">
+        <div class="negot-offer-amount${offerChanged ? ' changed' : ''}" id="negotOfferDisplay">$${n.offer.toLocaleString()}</div>
+        <div style="font-size:11px;color:var(--ink-dim);text-align:right">Current Offer<br><span style="font-size:9px">${n.done ? 'FINAL OFFER' : n.rounds + ' rounds left'}</span></div>
+      </div>
+      <div class="negot-mood-row">
+        <div class="negot-mood-label">Mood</div>
+        <div class="negot-mood-bar-wrap">
+          <div class="negot-mood-bar-fill" style="width:${moodPct}%;background:${mc}"></div>
+        </div>
+        <div class="negot-mood-value" style="color:${mc}">${ml}</div>
+      </div>
+      <div class="negot-flavor">${flavor}</div>
+    `;
+
+    // Sync the hidden original elements so game.js acceptSettlement still works
+    const negotOffer = document.getElementById('negotOffer');
+    if (negotOffer) negotOffer.textContent = '$' + n.offer.toLocaleString();
+    const negotMood = document.getElementById('negotMood');
+    if (negotMood) negotMood.textContent = ml;
+    const negotRounds = document.getElementById('negotRounds');
+    if (negotRounds) negotRounds.textContent = n.rounds;
+  };
+
+  /* ============================================================
+   * 25) CAREER PROFILE OVERLAY (post-verdict)
+   * Intercepts the "back to menu" button on the verdict screen.
+   * Shows a full career summary modal before returning to menu.
+   * ============================================================ */
+  function buildCareerOverlay(outcome) {
+    let overlay = document.getElementById('careerProfileOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'careerProfileOverlay';
+      document.body.appendChild(overlay);
+    }
+    // Reset in case it was previously hidden via display:none
+    overlay.style.display = '';
+    overlay.classList.remove('visible');
+
+    const p = _preservedPlayer || S.player;
+    if (!p) return;
+    const rank = getCareerRank(p.reputation || 0);
+    const outcomeTag = outcome === 'won' ? 'WON' : outcome === 'settle' ? 'SETTLED' : 'LOST';
+    const outcomeClass = outcome === 'won' ? 'won' : outcome === 'settle' ? 'settle' : 'lost';
+    const caseName = (S.caseData && S.caseData.title) || '—';
+
+    const perks = (p.perks && p.perks.length) ? p.perks.join(' • ') : 'None yet';
+    const wl = `${p.wins || 0}W / ${p.losses || 0}L`;
+
+    overlay.innerHTML = `
+      <div class="career-profile-card">
+        <h2>Career Update</h2>
+        <div class="career-rank-display">
+          <span class="career-rank-badge-large">${rank.badge}</span>
+          <div class="career-rank-title">${rank.title}</div>
+        </div>
+        <div class="career-last-case">
+          <span class="case-result-tag ${outcomeClass}">${outcomeTag}</span>
+          <div style="font-size:13px;color:var(--ink)">${caseName}</div>
+        </div>
+        <div class="career-stats-grid">
+          <div class="career-stat">
+            <div class="career-stat-label">Record</div>
+            <div class="career-stat-value" style="font-size:15px">${wl}</div>
+          </div>
+          <div class="career-stat">
+            <div class="career-stat-label">Reputation</div>
+            <div class="career-stat-value">${p.reputation || 0}</div>
+          </div>
+          <div class="career-stat">
+            <div class="career-stat-label">Balance</div>
+            <div class="career-stat-value" style="font-size:14px">$${(p.money || 0).toLocaleString()}</div>
+          </div>
+          <div class="career-stat">
+            <div class="career-stat-label">Perks</div>
+            <div class="career-stat-value" style="font-size:11px;color:var(--ink-dim)">${perks}</div>
+          </div>
+        </div>
+        <button class="career-profile-close" id="careerProfileCloseBtn">
+          ${typeof I18N !== 'undefined' && I18N.ar() ? 'العودة إلى القائمة ←' : 'Return to Menu →'}
+        </button>
+      </div>
+    `;
+
+    // Show overlay
+    requestAnimationFrame(() => overlay.classList.add('visible'));
+
+    // Close button → dismiss overlay (game already switched to menu or will)
+    document.getElementById('careerProfileCloseBtn').onclick = () => {
+      overlay.classList.remove('visible');
+      setTimeout(() => { overlay.style.display = 'none'; }, 400);
+    };
+    // Auto-hide after 30s if user ignores it
+    setTimeout(() => {
+      if (overlay.classList.contains('visible')) {
+        overlay.classList.remove('visible');
+        setTimeout(() => { overlay.style.display = 'none'; }, 400);
+      }
+    }, 30000);
+  }
+
+  // Intercept endCase to show the career overlay
+  const _origEndCaseCareer = Game.endCase.bind(Game);
+  Game.endCase = function (outcome, settlementAmt) {
+    _origEndCaseCareer(outcome, settlementAmt);
+    // Show career overlay after verdict renders (small delay)
+    const outcomeForOverlay = outcome;
+    setTimeout(() => {
+      try { buildCareerOverlay(outcomeForOverlay); } catch(e) { console.warn('Career overlay error:', e); }
+    }, 800);
+  };
+
+  console.log('[Suits Improvements v3] loaded — all fixes: testimony visibility, daily themes, campaign shuffle, visit handlers, shop persistence, settlement UI, career overlay.');
 })();
