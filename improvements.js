@@ -2921,6 +2921,18 @@
     myName: null, myStyle: null,
     hostReady: false, guestReady: false,
 
+    _peerCfg: {
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun.cloudflare.com:3478' },
+          { urls: 'stun:stun.services.mozilla.com' },
+        ]
+      }
+    },
+
     loadPeerJS(cb) {
       if (window.Peer) { cb(); return; }
       const s = document.createElement('script');
@@ -2938,7 +2950,7 @@
         this.isHost = true;
         this.myRole = 'host';
         try {
-          this.peer = new Peer();
+          this.peer = new Peer(undefined, this._peerCfg);
           this.peer.on('open', id => {
             const shortCode = id;
             showRoomCode(shortCode);
@@ -2970,12 +2982,12 @@
         this.isHost = false;
         this.myRole = 'guest';
         try {
-          this.peer = new Peer();
+          this.peer = new Peer(undefined, this._peerCfg);
           this.peer.on('open', () => {
-            this.conn = this.peer.connect(code.trim());
+            this.conn = this.peer.connect(code.trim(), { reliable: true });
             this._setupConn(this.conn);
           });
-          this.peer.on('error', err => setRoomStatus('Connection error: ' + err.message, false));
+          this.peer.on('error', err => setRoomStatus('⚠️ Error: ' + err.message + '<br><small>Make sure the room code is correct and the host is still waiting.</small>', false));
         } catch(e) {
           setRoomStatus('Error: ' + e.message, false);
         }
@@ -2987,20 +2999,35 @@
     },
 
     _setupConn(conn) {
+      const connTimeout = setTimeout(() => {
+        if (!conn.open) {
+          setRoomStatus(
+            '⚠️ Connection timed out.<br>' +
+            '<small>This usually means a firewall or router is blocking the connection. ' +
+            'Try: both players on the same WiFi, or both on mobile data. ' +
+            'If it still fails, your network may block peer-to-peer connections.</small>' +
+            '<br><button onclick="document.getElementById(\'joinRoomInput\').classList.remove(\'hidden\');document.getElementById(\'connectRoomBtn\').disabled=false;" style="margin-top:8px">↩ Try Again</button>',
+            false
+          );
+        }
+      }, 15000);
+
       conn.on('open', () => {
+        clearTimeout(connTimeout);
         setRoomStatus('<span class="online-connection-dot"></span> Connected!', true);
         document.getElementById('onlineStylePick').classList.remove('hidden');
         document.getElementById('joinRoomInput').classList.add('hidden');
       });
       conn.on('data', data => this._onMessage(data));
       conn.on('close', () => {
+        clearTimeout(connTimeout);
         setRoomStatus('<span class="online-connection-dot disconnected"></span> Opponent disconnected.', false);
         this.active = false;
         if (S.phase === 'court') {
           try { Game.courtLog('⚠️ Opponent disconnected. Match ended.', 'bad'); } catch(e) {}
         }
       });
-      conn.on('error', err => setRoomStatus('Error: ' + err.message, false));
+      conn.on('error', err => { clearTimeout(connTimeout); setRoomStatus('⚠️ Error: ' + err.message, false); });
     },
 
     _onMessage(data) {
