@@ -3042,22 +3042,19 @@
         else this.hostReady = true;
         if (this.hostReady && this.guestReady) this._startOnlineDuel();
       } else if (data.type === 'DUEL_ACTION') {
-        // Apply opponent's action locally
+        // Apply opponent's action locally — call orig directly to bypass turn-check
         if (!S.duel || S.duel.ended) return;
-        const myTurn = (this.isHost ? 1 : 2);
-        // It's the other player's turn
-        if (S.duel.turn === myTurn) return; // ignore — it's our turn
         try {
           if (data.action === 'duel_present') {
-            Game.duelPresent(data.idx);
+            _origDuelPresent && _origDuelPresent(data.idx);
           } else {
-            Game.duelAction(data.action);
+            _origDuelAction && _origDuelAction(data.action);
           }
         } catch(e) {}
         updateOnlineTurnBanner();
       } else if (data.type === 'SYNC') {
-        // Full state sync from host
-        if (!this.isHost && data.duel) {
+        // Both sides apply SYNC — whichever player just acted sends the truth
+        if (data.duel) {
           try {
             Object.assign(S.duel, data.duel);
             S.court = Object.assign(S.court || {}, data.court || {});
