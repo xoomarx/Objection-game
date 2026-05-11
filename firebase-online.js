@@ -1,7 +1,7 @@
 /* ============================================================
  * Objection! Power Suit - Firebase Online Duel Panel
- * This file intentionally ignores the old PeerJS/WebRTC modal.
- * It opens its own accessible Firebase room panel from Online Duel.
+ * Fix: after Join Room/Create Room, players stay in the Online Duel panel.
+ * The game no longer kicks players out of the popup immediately.
  * ============================================================ */
 (function () {
   'use strict';
@@ -9,15 +9,14 @@
   // PASTE YOUR FIREBASE WEB APP CONFIG HERE.
   // Firebase Console -> Project Overview -> Web app </> -> firebaseConfig
   const firebaseConfig = {
-  apiKey: "AIzaSyAtSclNannmL80K8LkenyWgDdvjUuaxhew",
-  authDomain: "objection-e892f.firebaseapp.com",
-  databaseURL: "https://objection-e892f-default-rtdb.firebaseio.com",
-  projectId: "objection-e892f",
-  storageBucket: "objection-e892f.firebasestorage.app",
-  messagingSenderId: "150068480059",
-  appId: "1:150068480059:web:d23cc1167387eb647a741e",
-  measurementId: "G-3V0VFDTJ3R"
-};
+    apiKey: 'PASTE_YOUR_API_KEY_HERE',
+    authDomain: 'objection-e892f.firebaseapp.com',
+    databaseURL: 'https://objection-e892f-default-rtdb.firebaseio.com',
+    projectId: 'objection-e892f',
+    storageBucket: 'objection-e892f.appspot.com',
+    messagingSenderId: 'PASTE_YOUR_MESSAGING_SENDER_ID_HERE',
+    appId: 'PASTE_YOUR_APP_ID_HERE'
+  };
 
   const $ = (id) => document.getElementById(id);
 
@@ -27,6 +26,7 @@
     roomRef: null,
     role: '',
     playerId: '',
+    started: false,
 
     configured() {
       return firebaseConfig.apiKey && !firebaseConfig.apiKey.includes('PASTE_') &&
@@ -68,9 +68,9 @@
       panel.innerHTML = `
         <div class="firebase-online-card" role="dialog" aria-modal="true" aria-labelledby="firebaseOnlineTitle">
           <h2 id="firebaseOnlineTitle">🌐 Online Duel</h2>
-          <p class="intro">Create a Firebase room, send your friend the code, and play without WebRTC relay errors.</p>
+          <p class="intro">Create a Firebase room, send your friend the code, then wait here until both players are connected.</p>
 
-          <div class="firebase-online-actions">
+          <div class="firebase-online-actions" id="firebaseMainActions">
             <button class="big primary" id="firebaseCreateRoomBtn" type="button">Create Room</button>
             <button class="big" id="firebaseShowJoinBtn" type="button">Join Room</button>
             <button class="big" id="firebaseCloseBtn" type="button">Back</button>
@@ -87,8 +87,15 @@
             <button class="big primary" id="firebaseJoinBtn" type="button">Join</button>
           </div>
 
+          <div id="firebaseLobbyBox" class="hidden center" style="margin-top:14px;">
+            <h3>Lobby</h3>
+            <p id="firebaseLobbyInfo">Waiting...</p>
+            <button class="big primary hidden" id="firebaseStartDuelBtn" type="button">Start Duel</button>
+            <button class="big" id="firebaseLeaveBtn" type="button">Leave Room</button>
+          </div>
+
           <div id="firebaseOnlineStatus" class="firebase-online-status">Ready.</div>
-          <p class="firebase-online-note">If Create Room says Firebase is not configured, paste your real Firebase config into firebase-online.js first.</p>
+          <p class="firebase-online-note">Do not close this panel until both players show as connected.</p>
         </div>
       `;
       document.body.appendChild(panel);
@@ -103,6 +110,8 @@
       $('firebaseJoinBtn').addEventListener('click', () => this.joinRoom(($('firebaseRoomInput') || {}).value || ''));
       $('firebaseCopyBtn').addEventListener('click', () => this.copyCode());
       $('firebaseCloseBtn').addEventListener('click', () => this.hidePanel());
+      $('firebaseLeaveBtn').addEventListener('click', () => this.leaveRoom());
+      $('firebaseStartDuelBtn').addEventListener('click', () => this.requestStartDuel());
       panel.addEventListener('click', (e) => { if (e.target === panel) this.hidePanel(); });
 
       return panel;
@@ -111,7 +120,7 @@
     showPanel() {
       const panel = this.ensurePanel();
       panel.classList.remove('hidden');
-      this.status('Ready. Create a room or join with a code.');
+      if (!this.roomRef) this.status('Ready. Create a room or join with a code.');
     },
 
     hidePanel() {
@@ -124,6 +133,15 @@
       if (el) el.innerHTML = html;
     },
 
+    showLobby(info, canStart) {
+      const lobby = $('firebaseLobbyBox');
+      const lobbyInfo = $('firebaseLobbyInfo');
+      const startBtn = $('firebaseStartDuelBtn');
+      if (lobby) lobby.classList.remove('hidden');
+      if (lobbyInfo) lobbyInfo.textContent = info || 'Waiting...';
+      if (startBtn) startBtn.classList.toggle('hidden', !canStart);
+    },
+
     async createRoom() {
       this.showPanel();
       if (!this.initFirebase()) return;
@@ -131,6 +149,7 @@
       this.roomCode = this.makeCode();
       this.playerId = 'host_' + Math.random().toString(36).slice(2);
       this.role = 'host';
+      this.started = false;
       this.roomRef = this.db.ref('rooms/' + this.roomCode);
 
       try {
@@ -139,14 +158,14 @@
           status: 'waiting',
           host: this.playerId,
           guest: null,
-          hostReady: false,
-          guestReady: false,
-          state: null
+          started: false,
+          startedAt: null
         });
         $('firebaseRoomCode').textContent = this.roomCode;
         $('firebaseRoomBox').classList.remove('hidden');
         $('firebaseJoinBox').classList.add('hidden');
-        this.status('Room created. Send this code to your friend. Waiting for guest...');
+        this.showLobby('Waiting for your friend to join...', false);
+        this.status('Room created. Send this code to your friend.');
         this.listen();
       } catch (err) {
         this.status('Could not create room: ' + (err && err.message ? err.message : err));
@@ -162,15 +181,19 @@
       this.roomCode = code;
       this.playerId = 'guest_' + Math.random().toString(36).slice(2);
       this.role = 'guest';
+      this.started = false;
       this.roomRef = this.db.ref('rooms/' + this.roomCode);
 
       try {
         const snap = await this.roomRef.get();
         if (!snap.exists()) { this.status('Room not found. Check the code and try again.'); return; }
         await this.roomRef.update({ guest: this.playerId, status: 'connected' });
-        this.status('Connected to room. Starting local duel screen...');
+        $('firebaseRoomCode').textContent = this.roomCode;
+        $('firebaseRoomBox').classList.remove('hidden');
+        $('firebaseJoinBox').classList.add('hidden');
+        this.showLobby('Connected. Waiting for host to start the duel...', false);
+        this.status('Joined room ' + this.roomCode + '. Stay on this screen.');
         this.listen();
-        this.startDuelScreen();
       } catch (err) {
         this.status('Could not join room: ' + (err && err.message ? err.message : err));
       }
@@ -178,13 +201,61 @@
 
     listen() {
       if (!this.roomRef) return;
-      this.roomRef.child('status').off();
-      this.roomRef.child('status').on('value', (snap) => {
-        if (snap.val() === 'connected' && this.role === 'host') {
-          this.status('Friend connected. Starting local duel screen...');
+      this.roomRef.off();
+      this.roomRef.on('value', (snap) => {
+        const room = snap.val();
+        if (!room) return;
+
+        if (room.status === 'connected') {
+          if (this.role === 'host') {
+            this.showLobby('Friend connected. Click Start Duel when ready.', true);
+            this.status('Both players are connected in room ' + this.roomCode + '.');
+          } else {
+            this.showLobby('Connected. Waiting for host to start the duel...', false);
+            this.status('Both players are connected in room ' + this.roomCode + '.');
+          }
+        } else if (room.status === 'waiting') {
+          this.showLobby('Waiting for your friend to join...', false);
+        }
+
+        if (room.started && !this.started) {
+          this.started = true;
+          this.status('Starting duel...');
           this.startDuelScreen();
         }
       });
+    },
+
+    async requestStartDuel() {
+      if (!this.roomRef || this.role !== 'host') return;
+      try {
+        await this.roomRef.update({ started: true, startedAt: Date.now(), status: 'started' });
+        this.started = true;
+        this.status('Starting duel...');
+        this.startDuelScreen();
+      } catch (err) {
+        this.status('Could not start duel: ' + (err && err.message ? err.message : err));
+      }
+    },
+
+    async leaveRoom() {
+      try {
+        if (this.roomRef) {
+          if (this.role === 'host') await this.roomRef.remove();
+          else await this.roomRef.update({ guest: null, status: 'waiting', started: false });
+          this.roomRef.off();
+        }
+      } catch (e) {}
+      this.roomRef = null;
+      this.roomCode = '';
+      this.role = '';
+      this.playerId = '';
+      this.started = false;
+      const lobby = $('firebaseLobbyBox');
+      if (lobby) lobby.classList.add('hidden');
+      const roomBox = $('firebaseRoomBox');
+      if (roomBox) roomBox.classList.add('hidden');
+      this.status('Left room. Create a room or join with a code.');
     },
 
     copyCode() {
@@ -236,7 +307,7 @@
       OnlineFirebase.showPanel();
     }, true);
 
-    console.log('[Firebase Online Duel] installed: Online Duel button opens Firebase panel.');
+    console.log('[Firebase Online Duel] installed: Online Duel button opens Firebase lobby panel.');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
