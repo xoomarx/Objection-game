@@ -9,14 +9,15 @@
   // PASTE YOUR FIREBASE WEB APP CONFIG HERE.
   // Firebase Console -> Project Overview -> Web app </> -> firebaseConfig
   const firebaseConfig = {
-    apiKey: 'PASTE_YOUR_API_KEY_HERE',
-    authDomain: 'objection-e892f.firebaseapp.com',
-    databaseURL: 'https://objection-e892f-default-rtdb.firebaseio.com',
-    projectId: 'objection-e892f',
-    storageBucket: 'objection-e892f.appspot.com',
-    messagingSenderId: 'PASTE_YOUR_MESSAGING_SENDER_ID_HERE',
-    appId: 'PASTE_YOUR_APP_ID_HERE'
-  };
+  apiKey: "AIzaSyAtSclNannmL80K8LkenyWgDdvjUuaxhew",
+  authDomain: "objection-e892f.firebaseapp.com",
+  databaseURL: "https://objection-e892f-default-rtdb.firebaseio.com",
+  projectId: "objection-e892f",
+  storageBucket: "objection-e892f.firebasestorage.app",
+  messagingSenderId: "150068480059",
+  appId: "1:150068480059:web:d23cc1167387eb647a741e",
+  measurementId: "G-3V0VFDTJ3R"
+};
 
   const $ = (id) => document.getElementById(id);
 
