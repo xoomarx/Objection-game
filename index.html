@@ -23,23 +23,28 @@
   </header>
 
   <section id="menu" class="screen menu-screen">
+    <div class="menu-court-seal" aria-hidden="true">
+      <div class="seal-ring outer"></div>
+      <div class="seal-ring inner"></div>
+      <div class="seal-gavel">⚖</div>
+    </div>
     <div class="menu-hero">
       <div class="pixel-lawyer hero-left"></div>
       <div class="title-box">
-        <div class="case-stamp">LAWYER VS LAWYER</div>
-        <h1>OBJECTION!</h1>
-        <h2>POWER SUIT</h2>
-        <p class="tag">A pixel courtroom drama</p>
+        <div class="case-stamp" data-en="LAWYER VS LAWYER">LAWYER VS LAWYER</div>
+        <h1 class="menu-title-objection">OBJECTION!</h1>
+        <h2 class="menu-title-powsuit">POWER SUIT</h2>
+        <p class="tag" data-en-html="A pixel courtroom drama">A pixel courtroom drama</p>
       </div>
       <div class="pixel-lawyer hero-right"></div>
     </div>
     <div class="menu-dossier">
-      <p><b>Main Goal:</b> Win stylish courtroom fights with evidence, objections, cross-examination, and closing arguments.</p>
+      <p data-en-html="&lt;b&gt;Main Goal:&lt;/b&gt; Win stylish courtroom fights with evidence, objections, cross-examination, and closing arguments."><b>Main Goal:</b> Win stylish courtroom fights with evidence, objections, cross-examination, and closing arguments.</p>
       <div class="docket-board">
-        <div class="docket-title">TODAY'S DOCKET</div>
-        <div>• Build Focus, chain Combos, then land a Dramatic Reveal.</div>
-        <div>• Use Second Chair Save when Adrenaline peaks.</div>
-        <div>• Win cases to unlock career perks and harder trials.</div>
+        <div class="docket-title" data-en="TODAY'S DOCKET">TODAY'S DOCKET</div>
+        <div data-en="• Build Focus, chain Combos, then land a Dramatic Reveal.">• Build Focus, chain Combos, then land a Dramatic Reveal.</div>
+        <div data-en="• Use Second Chair Save when Adrenaline peaks.">• Use Second Chair Save when Adrenaline peaks.</div>
+        <div data-en="• Win cases to unlock career perks and harder trials.">• Win cases to unlock career perks and harder trials.</div>
       </div>
     </div>
     <div class="difficulty-panel" id="difficultyPanel">
@@ -53,17 +58,18 @@
       <p class="small" id="difficultyHint">Story is easy, Associate is normal, Partner is hard, Legendary is brutal.</p>
     </div>
     <div class="btn-col menu-buttons">
-      <button class="big primary" data-act="campaign">Start Campaign</button>
-      <button class="big" data-act="continue-career" id="continueBtn">Continue Career</button>
+      <button class="big primary menu-btn-campaign" data-act="campaign">⚖ Start Campaign</button>
+      <button class="big" data-act="continue-career" id="continueBtn">▶ Continue Career</button>
+      <button class="big menu-btn-online" data-act="online-duel" id="onlineDuelBtn">🌐 Online Duel</button>
+      <button class="big" data-act="duel">⚔ Local Duel Mode</button>
       <button class="big" data-act="random-case">Random Case Generator</button>
-      <button class="big" data-act="duel">Local Duel Mode</button>
-      <button class="big" data-act="howto">How to Play</button>
+      <button class="big" data-act="howto">❓ How to Play</button>
       <button class="big" data-act="credits">Credits</button>
       <button class="big" data-act="shop">💰 The Chambers</button>
       <button class="big" data-act="rankings">🏆 Rankings &amp; Awards</button>
       <button class="big" id="menuLangBtn" data-act="toggle-lang">العربية</button>
     </div>
-    <p class="footer">All names, art, and audio are original. Not affiliated with any television series.</p>
+    <p class="footer" data-en="All names, art, and audio are original. Not affiliated with any television series.">All names, art, and audio are original. Not affiliated with any television series.</p>
   </section>
 
   <section id="howto" class="screen hidden">
@@ -285,6 +291,55 @@
     <div id="achGrid" class="ach-grid"></div>
     <button class="big" data-act="back-menu">Back</button>
   </section>
+
+
+  <!-- Online Multiplayer Modal -->
+  <div id="onlineDuelModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-icon">🌐</span>
+        <h2 id="onlineModalTitle">Online Duel</h2>
+        <button class="modal-close" id="onlineModalClose">✕</button>
+      </div>
+      <div id="onlineModalContent">
+        <p class="modal-intro" id="onlineModalIntro">Challenge a friend to a real-time courtroom battle — no account needed.</p>
+        <div class="online-lobby-btns">
+          <button class="big primary" id="createRoomBtn">⚡ Create Room</button>
+          <button class="big" id="joinRoomBtn">🔗 Join Room</button>
+        </div>
+        <div id="joinRoomInput" class="hidden">
+          <input id="roomCodeInput" maxlength="20" placeholder="Paste room code or link…" autocomplete="off" />
+          <button class="big primary" id="connectRoomBtn">Connect →</button>
+        </div>
+        <div id="roomStatusBox" class="room-status-box hidden">
+          <div id="roomStatusText">Waiting…</div>
+          <div id="roomCodeDisplay" class="room-code-display hidden"></div>
+          <button class="big" id="copyCodeBtn" style="display:none">📋 Copy Code</button>
+        </div>
+        <div id="onlineStylePick" class="hidden">
+          <p class="modal-intro">Choose your style for this duel:</p>
+          <div id="onlineStyleGrid" class="style-grid small"></div>
+          <input id="onlineNameInput" maxlength="16" placeholder="Your lawyer name" value="" style="margin-top:8px" />
+          <button class="big primary" id="onlineReadyBtn" disabled style="margin-top:10px">Ready →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cutscene Overlay -->
+  <div id="cutsceneOverlay" class="cutscene-overlay hidden" aria-live="assertive">
+    <div class="cutscene-inner">
+      <div id="cutsceneIcon" class="cutscene-icon"></div>
+      <div id="cutsceneTitle" class="cutscene-title"></div>
+      <div id="cutsceneSubtitle" class="cutscene-subtitle"></div>
+    </div>
+  </div>
+
+  <!-- Body Language Panel (injected into court at runtime) -->
+  <div id="bodyLangPanel" class="body-lang-panel hidden">
+    <div id="playerBodyLang" class="body-lang-badge player-side"></div>
+    <div id="oppBodyLang" class="body-lang-badge opp-side"></div>
+  </div>
 
 </div>
 <script src="game.js"></script>

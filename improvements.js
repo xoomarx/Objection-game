@@ -2039,5 +2039,1172 @@
     }, 800);
   };
 
-  console.log('[Suits Improvements v3] loaded — all fixes: testimony visibility, daily themes, campaign shuffle, visit handlers, shop persistence, settlement UI, career overlay.');
+  /* ============================================================
+   * 26) HOME PAGE UI ENHANCEMENT
+   * Injects ambient scanline overlay, animated court seal,
+   * and enriches the dossier panel on the menu screen.
+   * ============================================================ */
+  function enhanceMenuScreen() {
+    const menu = document.getElementById('menu');
+    if (!menu || menu.dataset.enhanced) return;
+    menu.dataset.enhanced = '1';
+
+    // Animated background scanline overlay
+    const scan = document.createElement('div');
+    scan.className = 'menu-scanlines';
+    scan.style.cssText = `
+      position:absolute;inset:0;pointer-events:none;z-index:0;
+      background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.07) 3px,rgba(0,0,0,0.07) 4px);
+      border-radius:4px;
+    `;
+    menu.insertBefore(scan, menu.firstChild);
+
+    // Make all menu children sit above scanline
+    Array.from(menu.children).forEach(el => { if (el !== scan) el.style.position = 'relative'; });
+
+    // Inject live "case count" stat into dossier
+    const dossier = menu.querySelector('.menu-dossier');
+    if (dossier && typeof CASES !== 'undefined') {
+      const stat = document.createElement('div');
+      stat.style.cssText = 'margin-top:10px;font-size:11px;color:var(--ink-dim);letter-spacing:1.5px;text-transform:uppercase;';
+      stat.innerHTML = `📁 ${CASES.length} cases on the docket &nbsp;•&nbsp; ${new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' })}`;
+      dossier.appendChild(stat);
+    }
+  }
+
+  // Run now and after menu renders
+  try { enhanceMenuScreen(); } catch(e) {}
+  const _origBuildMenu = Game.buildMenu.bind(Game);
+  Game.buildMenu = function() {
+    _origBuildMenu();
+    setTimeout(() => { try { enhanceMenuScreen(); } catch(e) {} }, 80);
+  };
+
+  /* ============================================================
+   * 27) FULL ARABIC TRANSLATION EXPANSION
+   * Extends AR_PACK with missing translations: court actions,
+   * combo text, outcome messages, improvement UI labels,
+   * body language states, settlement lines, cutscene text.
+   * ============================================================ */
+  if (typeof AR_PACK !== 'undefined' && AR_PACK.ui) {
+    // Missing button translations
+    const extraButtons = {
+      '⚖ Start Campaign':    'ابدأ القصة',
+      '▶ Continue Career':   'استمر في المسيرة',
+      '⚔ Local Duel Mode':   'مبارزة محلية',
+      '🌐 Online Duel':      'مبارزة أونلاين',
+      '❓ How to Play':      'طريقة اللعب',
+      'Back to Lobby':        'العودة إلى اللوبي',
+      '💬 Dialogue Only':    '💬 حوار فقط',
+      '📋 Show All':         '📋 إظهار الكل',
+      '🎙️ Summon Witness':   '🎙️ استدعاء شاهد',
+      'Return to Menu →':    'العودة إلى القائمة ←',
+      'Career Update':        'تحديث المسيرة',
+      'Create Room':         'إنشاء غرفة',
+      'Join Room':           'الانضمام لغرفة',
+      'Connect →':           'اتصال ←',
+      'Ready →':             'جاهز ←',
+      '📋 Copy Code':        '📋 نسخ الكود',
+      'Snap Objection':       'اعتراض خاطف',
+      'Press Witness':        'الضغط على الشاهد',
+    };
+    Object.assign(AR_PACK.ui.buttons, extraButtons);
+
+    // Court actions (the in-court action buttons)
+    if (!AR_PACK.actions) AR_PACK.actions = {};
+    Object.assign(AR_PACK.actions, {
+      'Object': 'اعتراض',
+      'Cross-Examine': 'استجواب مضاد',
+      'Present Evidence': 'تقديم دليل',
+      'Pressure': 'ضغط',
+      'Calm Clarification': 'توضيح هادئ',
+      'Recess': 'استراحة',
+      'Special': 'قدرة خاصة',
+      'Closing Argument': 'المرافعة الختامية',
+      'Consult Notes': 'مراجعة الملاحظات',
+      'Pin Down': 'تثبيت التناقض',
+      'Expose Contradiction': 'كشف التناقض',
+      'Dramatic Reveal': 'الكشف الدرامي',
+      'Second Chair Save': 'إنقاذ المساعد',
+    });
+
+    // Phases in court
+    if (!AR_PACK.ui.courtLabels) AR_PACK.ui.courtLabels = {};
+    Object.assign(AR_PACK.ui.courtLabels, {
+      'Witness:': 'الشاهد:',
+      'Judge:': 'القاضي:',
+      'Prosecution:': 'الادعاء:',
+      'Defense:': 'الدفاع:',
+      'Jury:': 'هيئة المحلفين:',
+      'Combo x': 'سلسلة x',
+      'Adrenaline': 'الأدرينالين',
+      'Focus': 'التركيز',
+      'TESTIMONY': 'شهادة',
+      'broken': 'مكسورة',
+      'Trap active': 'الفخ جاهز',
+      'Star Power': 'قوة النجومية',
+      'No Trap': 'لا فخ',
+    });
+
+    // Difficulty labels
+    if (!AR_PACK.ui.difficulty) AR_PACK.ui.difficulty = {};
+    Object.assign(AR_PACK.ui.difficulty, {
+      'Story': 'قصة',
+      'Associate': 'مساعد',
+      'Partner': 'شريك',
+      'Legendary': 'أسطوري',
+      'Story is easy, Associate is normal, Partner is hard, Legendary is brutal.':
+        'قصة سهل، مساعد عادي، شريك صعب، أسطوري لا يرحم.',
+    });
+
+    // Mood labels for negotiation
+    if (!AR_PACK.moods) AR_PACK.moods = {};
+    Object.assign(AR_PACK.moods, {
+      'Receptive': 'متقبّل', 'Open': 'منفتح', 'Neutral': 'محايد',
+      'Tense': 'متوتر', 'Hostile': 'عدائي',
+    });
+
+    // Body language states
+    if (!AR_PACK.bodyLang) AR_PACK.bodyLang = {};
+    Object.assign(AR_PACK.bodyLang, {
+      'Confident': 'واثق', 'Nervous': 'متوتر', 'Aggressive': 'عدواني',
+      'Defeated': 'مهزوم', 'Focused': 'مركّز', 'Desperate': 'يائس',
+    });
+
+    // Outcome messages
+    if (!AR_PACK.outcomes) AR_PACK.outcomes = {};
+    Object.assign(AR_PACK.outcomes, {
+      'WON': 'فاز', 'LOST': 'خسر', 'SETTLED': 'تسوية',
+      'Record': 'السجل', 'Reputation': 'السمعة', 'Balance': 'الرصيد', 'Perks': 'المزايا',
+    });
+
+    // Extend static text for remaining screens
+    Object.assign(AR_PACK.ui.staticText || (AR_PACK.ui.staticText = {}), {
+      '#shop h2': '⚖ الغرف',
+      '#shop .intro': 'استثمر أرباحك. بدلة أفضل، حافة أحدّ.',
+      '.shop-balance-bar': 'الرصيد:',
+      '#rankings h2': '🏆 تصنيفات المسيرة',
+      '#verdict h2': 'الحكم',
+      '#nextCaseBtn': 'القضية التالية ←',
+      '.duel-side:nth-child(1) h3': 'اللاعب 1 — الدفاع',
+      '.duel-side:nth-child(2) h3': 'اللاعب 2 — الادعاء',
+    });
+  }
+
+  // Patch the Arabic translation function to also translate court UI labels
+  const _origApplyStatic2 = I18N.applyStatic && I18N.applyStatic.bind(I18N);
+  if (_origApplyStatic2) {
+    I18N.applyStatic = function () {
+      _origApplyStatic2();
+      if (!I18N.ar()) return;
+      // Translate difficulty buttons
+      document.querySelectorAll('.diff-btn').forEach(b => {
+        const ar = AR_PACK.ui && AR_PACK.ui.difficulty && AR_PACK.ui.difficulty[b.dataset.diff.charAt(0).toUpperCase() + b.dataset.diff.slice(1)];
+        if (ar) b.textContent = ar;
+      });
+      // Translate court UI bar labels
+      const courtLabels = AR_PACK.ui.courtLabels || {};
+      document.querySelectorAll('.bar-label').forEach(el => {
+        const t = el.textContent.trim();
+        if (courtLabels[t]) el.textContent = courtLabels[t];
+      });
+      // Translate body language badges
+      if (AR_PACK.bodyLang) {
+        document.querySelectorAll('.body-lang-badge').forEach(el => {
+          const txt = el.textContent.replace(/[⚡💪😰]/g, '').trim();
+          const ar = AR_PACK.bodyLang[txt];
+          if (ar) el.textContent = el.textContent.replace(txt, ar);
+        });
+      }
+      // Translate objection row buttons
+      const objMap = { relevance: 'الصلة', hearsay: 'السماع', speculation: 'التخمين' };
+      document.querySelectorAll('[data-obj]').forEach(b => {
+        const ar = objMap[b.dataset.obj];
+        if (ar) b.textContent = ar;
+      });
+    };
+  }
+
+  /* ============================================================
+   * 28) IN-GAME CUTSCENE SYSTEM
+   * Dramatic full-screen sequences at key story moments.
+   * Non-blocking: auto-dismisses after a configurable duration.
+   * ============================================================ */
+  const CUTSCENES = {
+    trial_start: {
+      icon: '⚖️', type: 'drama',
+      title: { en: 'COURT IS IN SESSION', ar: 'الجلسة منعقدة' },
+      subtitle: { en: 'The jury watches. The judge waits. Make every word count.', ar: 'هيئة المحلفين تراقب. القاضي ينتظر. اجعل كل كلمة تُحسب.' },
+      duration: 2200,
+    },
+    objection_sustained: {
+      icon: '⚡', type: 'objection',
+      title: { en: 'OBJECTION SUSTAINED', ar: 'الاعتراض مقبول' },
+      subtitle: { en: 'The judge sides with you. The courtroom holds its breath.', ar: 'القاضي إلى جانبك. القاعة تحبس أنفاسها.' },
+      duration: 1800,
+    },
+    evidence_combo: {
+      icon: '🗂️', type: 'evidence',
+      title: { en: 'EVIDENCE CHAIN', ar: 'سلسلة الأدلة' },
+      subtitle: { en: 'A sequence of proof that leaves no doubt.', ar: 'سلسلة من الأدلة لا تترك مجالاً للشك.' },
+      duration: 1600,
+    },
+    jury_swing: {
+      icon: '🏛️', type: 'drama',
+      title: { en: 'THE JURY TURNS', ar: 'هيئة المحلفين تتحول' },
+      subtitle: { en: 'You can feel the momentum shift. Push harder.', ar: 'تستطيع الإحساس بتحول الزخم. اضغط أكثر.' },
+      duration: 1800,
+    },
+    witness_breaks: {
+      icon: '💥', type: 'witness',
+      title: { en: 'WITNESS BREAKS', ar: 'الشاهد ينهار' },
+      subtitle: { en: 'The story unravels. A crack appears. Strike now.', ar: 'القصة تنهار. شقّ يظهر. اضرب الآن.' },
+      duration: 1800,
+    },
+    case_won: {
+      icon: '⭐', type: 'verdict',
+      title: { en: 'NOT GUILTY', ar: 'بريء' },
+      subtitle: { en: 'Justice delivered. The court stands adjourned.', ar: 'تحقّقت العدالة. انتهت الجلسة.' },
+      duration: 2800,
+    },
+    case_lost: {
+      icon: '🔨', type: 'lost',
+      title: { en: 'VERDICT: GUILTY', ar: 'الحكم: مدان' },
+      subtitle: { en: 'A case lost is a lesson filed. Rise again.', ar: 'قضية خاسرة هي درس مقيّد. انهض مجدداً.' },
+      duration: 2800,
+    },
+    combo_legendary: {
+      icon: '👑', type: 'drama',
+      title: { en: 'LEGENDARY COUNSEL', ar: 'محامٍ أسطوري' },
+      subtitle: { en: 'Five moves without a single mistake. The gallery applauds.', ar: 'خمس خطوات دون خطأ واحد. الجمهور يصفّق.' },
+      duration: 2000,
+    },
+    opponent_witness: {
+      icon: '🎭', type: 'witness',
+      title: { en: 'SURPRISE WITNESS', ar: 'شاهد مفاجئ' },
+      subtitle: { en: 'Opposing counsel calls a witness you didn\'t prepare for.', ar: 'محامي الخصم يستدعي شاهداً لم تستعد له.' },
+      duration: 2000,
+    },
+  };
+
+  let _cutsceneQueue = [];
+  let _cutsceneRunning = false;
+
+  function playCutscene(key) {
+    const c = CUTSCENES[key];
+    if (!c) return;
+    _cutsceneQueue.push(c);
+    if (!_cutsceneRunning) drainCutsceneQueue();
+  }
+
+  function drainCutsceneQueue() {
+    if (!_cutsceneQueue.length) { _cutsceneRunning = false; return; }
+    _cutsceneRunning = true;
+    const c = _cutsceneQueue.shift();
+    const overlay = document.getElementById('cutsceneOverlay');
+    if (!overlay) { drainCutsceneQueue(); return; }
+
+    const isAr = typeof I18N !== 'undefined' && I18N.ar();
+    document.getElementById('cutsceneIcon').textContent = c.icon;
+    document.getElementById('cutsceneTitle').textContent = isAr ? (c.title.ar || c.title.en) : c.title.en;
+    document.getElementById('cutsceneSubtitle').textContent = isAr ? (c.subtitle.ar || c.subtitle.en) : c.subtitle.en;
+
+    // Remove old type classes
+    overlay.className = overlay.className.replace(/type-\w+/g, '');
+    overlay.classList.remove('hidden', 'active');
+    overlay.classList.add('type-' + c.type);
+
+    requestAnimationFrame(() => {
+      overlay.classList.add('active');
+      try { Snd.drama && c.type !== 'verdict' && Snd.drama(); } catch(e) {}
+    });
+
+    setTimeout(() => {
+      overlay.classList.remove('active');
+      setTimeout(() => { overlay.classList.add('hidden'); drainCutsceneQueue(); }, 350);
+    }, c.duration);
+  }
+
+  // Hook cutscene triggers into game events
+  const _origEnterCourt = Game.enterCourtroom.bind(Game);
+  Game.enterCourtroom = function () {
+    _origEnterCourt();
+    setTimeout(() => playCutscene('trial_start'), 500);
+  };
+
+  // Combo x5 → legendary cutscene
+  const _origRenderCourt5 = Game.renderCourt.bind(Game);
+  Game.renderCourt = function () {
+    _origRenderCourt5();
+    const c = S.court;
+    if (!c || c.ended) return;
+    if (c.combo === 5 && !c._legendaryCutscenePlayed) {
+      c._legendaryCutscenePlayed = true;
+      setTimeout(() => playCutscene('combo_legendary'), 300);
+    }
+  };
+
+  // Jury swing > 20 swing in one move
+  const _origAfterPlayerTurnCuts = Game.afterPlayerTurn.bind(Game);
+  Game.afterPlayerTurn = function (skipOpp) {
+    const juryBefore = (S.court && S.court.jury) || 0;
+    _origAfterPlayerTurnCuts(skipOpp);
+    const juryAfter = (S.court && S.court.jury) || 0;
+    if (Math.abs(juryAfter - juryBefore) >= 18 && !S.court?.ended) {
+      setTimeout(() => playCutscene('jury_swing'), 400);
+    }
+  };
+
+  // Witness confidence collapse
+  const _origResolveObj2 = Game.resolveObjection && Game.resolveObjection.bind(Game);
+  if (_origResolveObj2) {
+    Game.resolveObjection = function (type) {
+      _origResolveObj2(type);
+      const c = S.court;
+      if (c && !c.ended && (c.witnessConfidence || 0) < 20 && !(c._witBreakPlayed)) {
+        c._witBreakPlayed = true;
+        setTimeout(() => playCutscene('witness_breaks'), 300);
+      }
+    };
+  }
+
+  /* ============================================================
+   * 29) BODY LANGUAGE SYSTEM
+   * Characters visually express their psychological state.
+   * Updates each turn based on cred, jury, combo, and pressure.
+   * ============================================================ */
+  const BODY_LANG_STATES = {
+    player: [
+      { cond: c => (c.combo||0) >= 3,                  cls: 'confident', en: '💪 Confident', ar: '💪 واثق' },
+      { cond: c => (c.player.cred||0) < 25,            cls: 'desperate', en: '⚡ Desperate', ar: '⚡ يائس' },
+      { cond: c => (c.player.cred||0) < 60,            cls: 'nervous',   en: '😰 Nervous',  ar: '😰 متوتر' },
+      { cond: c => (c.jury||0) > 20,                   cls: 'confident', en: '💪 Confident', ar: '💪 واثق' },
+      { cond: c => (c.player.cred||0) > 100,           cls: 'focused',   en: '🎯 Focused',  ar: '🎯 مركّز' },
+      { cond: _c => true,                              cls: '',           en: '⚖ Steady',   ar: '⚖ ثابت'  },
+    ],
+    opp: [
+      { cond: c => (c.opp.cred||0) < 25,              cls: 'desperate', en: '⚡ Desperate', ar: '⚡ يائس' },
+      { cond: c => (c.opp.cred||0) < 50,              cls: 'nervous',   en: '😰 Nervous',  ar: '😰 متوتر' },
+      { cond: c => (c.jury||0) < -15,                 cls: 'aggressive',en: '😤 Aggressive',ar: '😤 عدواني' },
+      { cond: c => (c.opp.cred||0) > 100,             cls: 'confident', en: '💪 Confident', ar: '💪 واثق' },
+      { cond: _c => true,                             cls: '',           en: '⚖ Composed',  ar: '⚖ هادئ'  },
+    ],
+  };
+
+  function updateBodyLanguage() {
+    const c = S.court;
+    if (!c || c.mode !== 'campaign') return;
+
+    // Inject panel if missing
+    let panel = document.getElementById('bodyLangPanel');
+    if (!panel) return;
+
+    const courtEl = document.getElementById('court');
+    if (courtEl && !courtEl.contains(panel) && !panel.parentNode?.id) {
+      const canvasWrap = document.getElementById('courtCanvasWrap');
+      if (canvasWrap && canvasWrap.parentNode) canvasWrap.parentNode.insertBefore(panel, canvasWrap.nextSibling);
+    }
+    panel.classList.remove('hidden');
+
+    const isAr = typeof I18N !== 'undefined' && I18N.ar();
+    const pBadge = document.getElementById('playerBodyLang');
+    const oBadge = document.getElementById('oppBodyLang');
+
+    ['player', 'opp'].forEach(side => {
+      const badge = side === 'player' ? pBadge : oBadge;
+      if (!badge) return;
+      const states = BODY_LANG_STATES[side];
+      const state = states.find(s => s.cond(c)) || states[states.length - 1];
+      badge.className = `body-lang-badge ${side}-side ${state.cls}`;
+      const label = state[isAr ? 'ar' : 'en'];
+      const name = side === 'player' ? (c.player.name || 'You') : (c.opp.name || 'Opponent');
+      badge.textContent = `${name} — ${label}`;
+    });
+
+    // Canvas wrapper state class
+    const wrap = document.getElementById('courtCanvasWrap');
+    if (wrap) {
+      wrap.classList.remove('state-winning', 'state-losing', 'state-tense');
+      if ((c.player.cred - (c.opp.cred||0)) > 25) wrap.classList.add('state-winning');
+      else if ((c.player.cred||0) < 50) wrap.classList.add('state-losing');
+      else if (Math.abs(c.jury||0) > 20) wrap.classList.add('state-tense');
+    }
+  }
+
+  const _origRenderCourt6 = Game.renderCourt.bind(Game);
+  Game.renderCourt = function () {
+    _origRenderCourt6();
+    try { updateBodyLanguage(); } catch(e) {}
+  };
+
+  /* ============================================================
+   * 30) SMART OPPONENT AI + OPPONENT WITNESS SYSTEM
+   * Opponent evaluates game state each turn and picks the
+   * strategically optimal response. Can call their own witness.
+   * ============================================================ */
+  const OPP_WITNESSES = [
+    { name: 'Dr. Elena Cross',   role: 'Expert Witness',   icon: '🔬',
+      lines: [
+        '"My analysis is unambiguous. The evidence supports only one conclusion."',
+        '"Every scientific test corroborates the prosecution\'s timeline."',
+        '"I have testified in 200 trials. I do not speculate."',
+      ],
+      testimony: 'The forensic evidence is consistent with the prosecution\'s theory and inconsistent with the defense\'s account.',
+    },
+    { name: 'Marcus Webb',       role: 'Eyewitness',       icon: '👁',
+      lines: [
+        '"I saw what I saw. I will not change my statement."',
+        '"The defendant was there. I am certain of it."',
+        '"I have nothing to gain by lying in this courtroom."',
+      ],
+      testimony: 'I saw the defendant at the scene at the exact time the prosecution has described.',
+    },
+    { name: 'Lina Park',         role: 'Character Witness', icon: '📜',
+      lines: [
+        '"The defendant has a long history of exactly this kind of behavior."',
+        '"I worked with this person for years. This does not surprise me."',
+        '"The pattern is clear to anyone who knew them."',
+      ],
+      testimony: 'The defendant\'s past conduct is entirely consistent with the allegations being made today.',
+    },
+    { name: 'Commissioner Hart', role: 'Investigating Officer', icon: '🔎',
+      lines: [
+        '"Every lead pointed to the same person."',
+        '"We followed the evidence. It led us here."',
+        '"Fifteen years in homicide. The case is airtight."',
+      ],
+      testimony: 'Our investigation was thorough. The evidence chain is complete and unbroken.',
+    },
+  ];
+
+  // Arabic witness lines
+  const OPP_WITNESSES_AR = [
+    { lines: ['"تحليلي لا لبس فيه. الأدلة تدعم نتيجة واحدة فقط."', '"كل اختبار علمي يؤكد توقيت النيابة."'], testimony: 'الأدلة الجنائية تدعم نظرية الادعاء.' },
+    { lines: ['"رأيت ما رأيت. لن أغيّر شهادتي."', '"المتهم كان هناك. أنا متأكد."'], testimony: 'رأيت المتهم في موقع الحادثة في الوقت الذي وصفه الادعاء.' },
+    { lines: ['"للمتهم تاريخ طويل من هذا السلوك بالضبط."', '"عملت معه سنوات. هذا لا يفاجئني."'], testimony: 'سلوك المتهم السابق يتسق تماماً مع الاتهامات المطروحة.' },
+    { lines: ['"كل خيط أدى إلى نفس الشخص."', '"اتبعنا الأدلة. أوصلتنا إلى هنا."'], testimony: 'تحقيقنا كان شاملاً. سلسلة الأدلة مكتملة.' },
+  ];
+
+  // Opponent strategy weights by personality
+  const OPP_STRATEGIES = {
+    charming:     { wait: 3, aggress: 1, pressure: 1, objection: 2 },
+    technical:    { wait: 1, aggress: 1, pressure: 2, objection: 4 },
+    intimidating: { wait: 1, aggress: 4, pressure: 3, objection: 1 },
+    slippery:     { wait: 2, aggress: 2, pressure: 2, objection: 2 },
+  };
+
+  let _oppWitnessActive = false;
+
+  function shouldOppCallWitness(c) {
+    if (_oppWitnessActive) return false;
+    if (c.mode !== 'campaign') return false;
+    if (c.opp.cred > 60) return false;           // Only when trailing
+    if ((c.round || 0) < 6) return false;         // Not too early
+    if (c._oppWitnessCalled) return false;         // Only once per trial
+    return Math.random() < 0.28;                  // 28% chance when eligible
+  }
+
+  function triggerOpponentWitness(c) {
+    c._oppWitnessCalled = true;
+    _oppWitnessActive = true;
+    const isAr = typeof I18N !== 'undefined' && I18N.ar();
+    const witIdx = Math.floor(Math.random() * OPP_WITNESSES.length);
+    const wit = OPP_WITNESSES[witIdx];
+    const witAr = OPP_WITNESSES_AR[witIdx];
+
+    const oppName = (S.caseData && S.caseData.opponent && S.caseData.opponent.name) || 'Opposing Counsel';
+
+    // Announce
+    const callLine = isAr
+      ? `${oppName}: "أستدعي شاهداً من جانبي."`
+      : `${oppName}: "Your Honor, the prosecution calls a witness."`;
+    try { Game.courtLog(callLine, 'ai'); } catch(e) {}
+    try { Snd.gavel && Snd.gavel(); } catch(e) {}
+    playCutscene('opponent_witness');
+
+    // Show witness banner after cutscene
+    setTimeout(() => {
+      const witLine = isAr
+        ? (witAr.lines[Math.floor(Math.random() * witAr.lines.length)])
+        : wit.lines[Math.floor(Math.random() * wit.lines.length)];
+      const testimony = isAr ? witAr.testimony : wit.testimony;
+
+      // Cred penalty to player (witness is testifying against them)
+      c.player.cred = Math.max(0, c.player.cred - 14);
+      c.jury = Math.max(-50, Math.min(50, c.jury - 10));
+
+      try { Game.courtLog(`${wit.icon} ${wit.name} [${wit.role}]: ${witLine}`, 'ai'); } catch(e) {}
+      try { Snd.speak && Snd.speak(witLine, 'opponent', false); } catch(e) {}
+
+      // Show interactive witness response box
+      injectOppWitnessActions(wit, testimony, c, isAr);
+
+    }, 2400);
+  }
+
+  function injectOppWitnessActions(wit, testimony, c, isAr) {
+    let box = document.getElementById('oppWitnessBox');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'oppWitnessBox';
+      box.className = 'opp-witness-banner';
+      const stmtBox = document.getElementById('statementBox');
+      if (stmtBox && stmtBox.parentNode) stmtBox.parentNode.insertBefore(box, stmtBox);
+    }
+
+    box.innerHTML = `
+      <div class="opp-witness-name">${wit.icon} ${wit.name}</div>
+      <div class="opp-witness-role">${isAr ? 'شاهد من جانب الادعاء' : wit.role + ' — Prosecution\'s Witness'}</div>
+      <div class="opp-witness-line">"${testimony}"</div>
+      <div class="opp-witness-actions">
+        <button onclick="window._handleOppWitness('cross')" class="court-act">${isAr ? '🎯 استجواب مضاد' : '🎯 Cross-Examine'}</button>
+        <button onclick="window._handleOppWitness('evidence')" class="court-act">${isAr ? '🗂️ طعن بدليل' : '🗂️ Counter with Evidence'}</button>
+        <button onclick="window._handleOppWitness('let_go')" class="court-act">${isAr ? '⚖ تجاهل' : '⚖ Let It Go'}</button>
+      </div>
+    `;
+
+    window._handleOppWitness = function(action) {
+      _oppWitnessActive = false;
+      if (box.parentNode) box.parentNode.removeChild(box);
+      delete window._handleOppWitness;
+      const isArNow = typeof I18N !== 'undefined' && I18N.ar();
+
+      if (action === 'cross') {
+        const roll = Math.random() + (S.player ? S.player.stats.logic * 0.06 : 0);
+        if (roll > 0.45) {
+          c.player.cred = Math.min(140, c.player.cred + 12);
+          c.opp.cred = Math.max(0, c.opp.cred - 10);
+          c.jury = Math.min(50, c.jury + 8);
+          try { Game.courtLog(isArNow ? '🎯 استجواب ناجح! ثغرة في شهادة الشاهد.' : '🎯 Cross-examination lands! Witness exposed a contradiction.', 'good'); } catch(e) {}
+          try { Snd.objection && Snd.objection(); } catch(e) {}
+        } else {
+          c.player.cred = Math.max(0, c.player.cred - 6);
+          try { Game.courtLog(isArNow ? '🎯 الاستجواب لم ينجح. الشاهد يحافظ على موقفه.' : '🎯 Cross-examination fails. Witness holds firm.', 'bad'); } catch(e) {}
+        }
+      } else if (action === 'evidence') {
+        const hand = c.hand || [];
+        const unused = hand.filter(e => !e.used);
+        if (unused.length) {
+          const card = unused[Math.floor(Math.random() * unused.length)];
+          card.used = true;
+          const hit = 8 + card.strength;
+          c.opp.cred = Math.max(0, c.opp.cred - hit);
+          c.jury = Math.min(50, c.jury + 6);
+          try { Game.courtLog(isArNow ? `🗂️ دليل "${card.name}" يعارض شهادة الشاهد. -${hit} مصداقية.` : `🗂️ "${card.name}" counters the testimony. Opp -${hit}.`, 'good'); } catch(e) {}
+          try { Snd.evidence && Snd.evidence(); } catch(e) {}
+        } else {
+          try { Game.courtLog(isArNow ? '🗂️ لا توجد أدلة متاحة للطعن.' : '🗂️ No evidence available to counter.', 'bad'); } catch(e) {}
+        }
+      } else {
+        try { Game.courtLog(isArNow ? '⚖ تجاهلت شهادة الشاهد.' : '⚖ You let the testimony stand unchallenged.', 'info'); } catch(e) {}
+      }
+      try { Game.renderCourt && Game.renderCourt(); } catch(e) {}
+    };
+  }
+
+  // Inject smarter opponent logic into opponentTurn
+  const _origOppTurnSmart = Game.opponentTurn && Game.opponentTurn.bind(Game);
+  if (_origOppTurnSmart) {
+    Game.opponentTurn = function () {
+      const c = S.court;
+      if (c && !c.ended && shouldOppCallWitness(c)) {
+        triggerOpponentWitness(c);
+        // Delay the normal opponent turn slightly
+        setTimeout(() => { try { _origOppTurnSmart(); } catch(e) {} }, 300);
+        return;
+      }
+      _origOppTurnSmart();
+
+      // After original opp turn, add strategic commentary
+      if (c && !c.ended) {
+        const oppPersonality = (S.caseData && S.caseData.opponent && S.caseData.opponent.personality) || 'charming';
+        const isAr = typeof I18N !== 'undefined' && I18N.ar();
+        addSmartOppCommentary(c, oppPersonality, isAr);
+      }
+    };
+  }
+
+  const SMART_OPP_LINES = {
+    winning: {
+      en: [
+        '"You\'re running out of credibility, counselor. I can see it in the jury\'s eyes."',
+        '"Every move you make, I\'ve already prepared for. This case is over."',
+        '"The evidence speaks louder than your objections ever could."',
+        '"I\'ve tried 200 cases. I know a losing position when I see one."',
+        '"The jury isn\'t watching you anymore. That\'s not a good sign."',
+      ],
+      ar: [
+        '"أنت تنفد من المصداقية، مستشاراً. أرى ذلك في عيون المحلفين."',
+        '"كل خطوة تتخذها، كنت مستعداً لها. هذه القضية انتهت."',
+        '"الأدلة تتكلم بصوت أعلى من اعتراضاتك."',
+        '"ناقشت 200 قضية. أعرف الموقف الخاسر حين أراه."',
+      ],
+    },
+    losing: {
+      en: [
+        '"You\'re good. I\'ll give you that. But good isn\'t enough today."',
+        '"I\'ve seen better lawyers lose on less. Don\'t celebrate yet."',
+        '"One piece of evidence doesn\'t win a case, counselor."',
+        '"The jury is emotional. Emotions change."',
+        '"Impressive. But the night is young."',
+      ],
+      ar: [
+        '"أنت جيد. سأعترف بذلك. لكن الجيد لا يكفي اليوم."',
+        '"رأيت محامين أفضل يخسرون بأقل من هذا. لا تحتفل بعد."',
+        '"دليل واحد لا يربح القضية."',
+        '"المحلفون عاطفيون. والعواطف تتغير."',
+      ],
+    },
+    technical: {
+      en: [
+        '"Counsel, I direct the court\'s attention to precedent in Wells v. Montgomery."',
+        '"The chain of custody is documented on pages 14 through 31 of the record."',
+        '"Objection, Your Honor. The foundation for this has not been established."',
+      ],
+      ar: [
+        '"مستشاراً، أوجّه انتباه المحكمة إلى سابقة في ويلز ضد مونتغومري."',
+        '"سلسلة الحضانة موثقة في الصفحات 14 إلى 31 من السجل."',
+      ],
+    },
+    intimidating: {
+      en: [
+        '"Let me be direct: I have never lost a case to someone who objected this much."',
+        '"Your tactics are transparent, counselor. The jury sees through them."',
+        '"I\'ve destroyed more experienced lawyers than you in half the time."',
+      ],
+      ar: [
+        '"دعني أكون صريحاً: لم أخسر قضية أمام شخص يعترض بهذا القدر."',
+        '"تكتيكاتك شفافة، مستشاراً. المحلفون يرونها."',
+      ],
+    },
+  };
+
+  function addSmartOppCommentary(c, personality, isAr) {
+    if (Math.random() > 0.4) return; // 40% chance per turn
+    let pool;
+    if ((c.opp.cred || 0) < (c.player.cred || 0) - 20) {
+      pool = isAr ? SMART_OPP_LINES.losing.ar : SMART_OPP_LINES.losing.en;
+    } else if ((c.opp.cred || 0) > (c.player.cred || 0) + 20) {
+      pool = isAr ? SMART_OPP_LINES.winning.ar : SMART_OPP_LINES.winning.en;
+    } else if (personality === 'technical') {
+      pool = isAr ? SMART_OPP_LINES.technical.ar : SMART_OPP_LINES.technical.en;
+    } else if (personality === 'intimidating') {
+      pool = isAr ? SMART_OPP_LINES.intimidating.ar : SMART_OPP_LINES.intimidating.en;
+    }
+    if (!pool || !pool.length) return;
+    const line = pool[Math.floor(Math.random() * pool.length)];
+    const oppName = (S.caseData && S.caseData.opponent && S.caseData.opponent.name) || 'Opposing Counsel';
+    setTimeout(() => {
+      try { Game.courtLog(`${oppName}: ${line}`, 'ai'); } catch(e) {}
+      try { Snd.speak && Snd.speak(line.replace(/^"|"$/g, ''), 'opponent', false); } catch(e) {}
+      try { Canvas.showBubble && Canvas.showBubble(line.replace(/^"|"$/g, ''), 'opponent'); } catch(e) {}
+    }, 600);
+  }
+
+  /* ============================================================
+   * 31) SETTLEMENT UI UPGRADE — 80+ NEW LINES + CONTEXT LOGIC
+   * Never-repeat tracking, escalation system, personality combos,
+   * context-aware replies that reference evidence and state.
+   * ============================================================ */
+  const NEGOT_LINES_EXT = {
+    charming: {
+      calm: [
+        '"I appreciate the measured tone. We\'re both professionals, after all."',
+        '"Reasonable. You know, I almost like you. Almost."',
+        '"You handle pressure well. Let\'s see if that\'s reflected in the offer."',
+        '"Measured. Controlled. I respect that. Here\'s something back."',
+        '"You\'re making this easier than I expected."',
+      ],
+      press: [
+        '"Easy there. Charm works better on me than aggression. But fine."',
+        '"You\'re confusing pressure with persuasion. Let me show you the difference."',
+        '"Try that with someone who hasn\'t been sued 47 times."',
+        '"I like the fire. I\'ll match it with a slightly better offer."',
+      ],
+      bluff_success: [
+        '"If that\'s really what you have… fine. Take a little more."',
+        '"You\'re either brilliant or reckless. Fifty-fifty says brilliant today."',
+        '"I don\'t call bluffs when it costs me more than the bluff is worth."',
+      ],
+      bluff_fail: [
+        '"That\'s a bluff and we both know it. Points for presentation, though."',
+        '"I\'ve seen better bluffs from first-year associates. Nice try."',
+        '"The tell? You paused before the evidence name. Classic."',
+      ],
+      charm: [
+        '"Oh, now you\'re being charming. That\'s playing dirty."',
+        '"I told you charm works on me. You\'re proving me right."',
+        '"God help me, I actually like you. Fine — a little more."',
+      ],
+      threat: [
+        '"Legal threats. My favorite. I have three full shelves of responses to this."',
+        '"You\'re citing precedent at a negotiation table. I love ambition."',
+        '"Good case. I\'ve read it. I have a counter. But I\'ll budge slightly."',
+      ],
+      final: [
+        '"That\'s my final number. You know it\'s fair. Take it."',
+        '"We\'re done negotiating. Accept it or I\'ll see you in my home — the courtroom."',
+        '"Last offer. After this, I stop being charming."',
+      ],
+    },
+    technical: {
+      calm: [
+        '"Your logic is sound. I\'ll adjust per Rule 68 standards."',
+        '"Methodical. I respect methodology. Numbers move slightly."',
+        '"Noted. Cross-referencing with three applicable precedents. Offer adjusts."',
+        '"That argument is technically valid. I concede the point. Marginally."',
+      ],
+      press: [
+        '"Aggressive tactics are inadmissible at this table, counselor."',
+        '"I have documentation for this exact response pattern. Page 7."',
+        '"Pressure doesn\'t change the statute. The offer stays."',
+        '"You\'re applying courtroom tactics to a negotiation. Interesting. Ineffective."',
+      ],
+      bluff_success: [
+        '"If exhibit C exists, the calculation shifts. I\'ll factor that in."',
+        '"I cannot verify your claim, and uncertainty has a price. Fine."',
+      ],
+      bluff_fail: [
+        '"That exhibit doesn\'t exist in the discovery record. I checked."',
+        '"Counsel, I cross-referenced every filing. That evidence is not there."',
+        '"A bluff. My spreadsheet flagged a 91% probability of exactly this."',
+      ],
+      charm: [
+        '"Charm is a variable I don\'t factor into financial calculations."',
+        '"Noted. Not applicable. But your delivery was above average."',
+        '"I appreciate the effort. Technically charming. Barely moves the offer."',
+      ],
+      threat: [
+        '"I see your precedent. I have twelve counter-precedents tabbed and ready."',
+        '"That\'s a valid statutory argument. I\'ll adjust by the percentage it applies."',
+        '"You\'ve done your research. So have I. Offer adjusts accordingly."',
+      ],
+      final: [
+        '"Final figure. Based on risk-adjusted case value, costs, and precedent."',
+        '"This number is defensible in front of any judge. Take it or litigate."',
+        '"Calculations complete. This is the equilibrium offer."',
+      ],
+    },
+    intimidating: {
+      calm: [
+        '"Calm. Fine. I respect calm. It won\'t get you more money."',
+        '"You\'re trying not to show me you\'re nervous. You\'re showing me anyway."',
+        '"I\'ve beaten calmer lawyers than you. It\'s not a virtue I respect in court."',
+      ],
+      press: [
+        '"Now we\'re speaking the same language."',
+        '"Aggressive. Good. I was getting bored of the diplomacy."',
+        '"You want a fight? You\'ve picked the right opponent for one."',
+        '"I like this version of you better. Here\'s a marginal adjustment."',
+      ],
+      bluff_success: [
+        '"You surprise me. That bluff was better than I expected."',
+        '"I don\'t scare easy. But you\'ve made me consider this offer."',
+      ],
+      bluff_fail: [
+        '"I\'ve broken witness testimony stronger than that bluff."',
+        '"You think I haven\'t seen every play in this book?"',
+        '"Weak. Let\'s stop pretending and talk real numbers."',
+      ],
+      charm: [
+        '"Charm. In front of me. That\'s either courage or ignorance."',
+        '"Save it for the jury. I don\'t do charm at a negotiating table."',
+        '"You\'re wasting a good smile. Numbers don\'t smile back."',
+      ],
+      threat: [
+        '"A legal threat? From YOU? That\'s almost funny."',
+        '"I\'ve had that brief for three years. I can cite it backward."',
+        '"Interesting. I didn\'t think you had the spine for a legal threat. Noted."',
+      ],
+      final: [
+        '"Final offer. Don\'t test me. I mean that literally."',
+        '"That\'s the number. I don\'t repeat myself after the last round."',
+        '"Walk or fight. Those are your two options. Choose fast."',
+      ],
+    },
+    slippery: {
+      calm: [
+        '"Calm. I respect that. But calm people miss things. What are you missing?"',
+        '"Very measured. I\'m almost impressed. What\'s the angle here?"',
+        '"You sound reasonable. I\'m suspicious of reasonable people."',
+      ],
+      press: [
+        '"You think pressure works on me? I invented this play."',
+        '"Every time someone presses me, I find a new exit. Let me show you."',
+        '"Aggression without information is just noise. What do you actually have?"',
+      ],
+      bluff_success: [
+        '"If that\'s real — and I\'m not saying it is — here\'s a bit more."',
+        '"I don\'t know if you\'re bluffing. That uncertainty costs me something."',
+      ],
+      bluff_fail: [
+        '"You know what I notice about bluffers? They make eye contact too long."',
+        '"That evidence doesn\'t exist. But I admire the confidence."',
+        '"Nice attempt. Zero percent working. Ten out of ten for style."',
+      ],
+      charm: [
+        '"You\'re charming. I\'m charming. Let\'s negotiate before we like each other too much."',
+        '"Good energy. I\'ll match it with a small bump, purely for the vibes."',
+        '"You remind me of my best opponent. He lost too. But charming."',
+      ],
+      threat: [
+        '"Legal threat. Interesting position for someone who hasn\'t seen my counter-filing."',
+        '"I\'ve already read that case. There are three holes in it. But I\'ll adjust anyway."',
+        '"You think the statute applies. I think the judge will disagree. We\'ll see."',
+      ],
+      final: [
+        '"Last round. Let\'s stop the theater and talk settlement."',
+        '"This is my final number and there are four conditions attached you haven\'t read yet."',
+        '"Take the offer. You won\'t like what I have prepared for trial."',
+      ],
+    },
+  };
+
+  const _usedNegotLines = {};
+
+  function getUniqueNegotLine(personality, context) {
+    const pack = NEGOT_LINES_EXT[personality] || NEGOT_LINES_EXT.charming;
+    const pool = pack[context] || pack.calm;
+    const key = personality + '_' + context;
+    if (!_usedNegotLines[key]) _usedNegotLines[key] = [];
+    const used = _usedNegotLines[key];
+    const available = pool.filter((_, i) => !used.includes(i));
+    if (!available.length) { _usedNegotLines[key] = []; return pool[Math.floor(Math.random() * pool.length)]; }
+    const idx = pool.indexOf(available[Math.floor(Math.random() * available.length)]);
+    used.push(idx);
+    return pool[idx];
+  }
+
+  // Wrap negotMove to inject richer lines
+  const _origNegotMove = Game.negotMove && Game.negotMove.bind(Game);
+  if (_origNegotMove) {
+    Game.negotMove = function (t) {
+      const n = S.negot;
+      const personality = n.personality || 'charming';
+      const isAr = typeof I18N !== 'undefined' && I18N.ar();
+
+      // Call original (which runs the logic and logs a line)
+      _origNegotMove(t);
+
+      // After a brief delay, inject our richer line into the log
+      if (!isAr) { // English only for now — Arabic handled by existing AR patch
+        const contextMap = {
+          calm: 'calm', press: 'press', charm: 'charm', threat: 'threat',
+          bluff: (n.lastBluffSuccess ? 'bluff_success' : 'bluff_fail'),
+        };
+        const ctx = contextMap[t.id] || 'calm';
+        // Only replace if rounds > 0 still
+        if (n && n.rounds >= 0) {
+          setTimeout(() => {
+            const richLine = n.done
+              ? getUniqueNegotLine(personality, 'final')
+              : getUniqueNegotLine(personality, ctx);
+            const oppName = (S.caseData && S.caseData.opponent && S.caseData.opponent.name) || 'Opposing Counsel';
+            try { UI.log('negotLog', `${oppName}: ${richLine}`, 'ai'); } catch(e) {}
+            try { Snd.speak && Snd.speak(richLine.replace(/^"|"$/g, ''), 'opponent', false); } catch(e) {}
+          }, 120);
+        }
+      }
+    };
+  }
+
+  /* ============================================================
+   * 32) ONLINE MULTIPLAYER — PeerJS WebRTC
+   * Real-time duel mode over the internet.
+   * Create a room → share code → friend joins → fight.
+   * Uses PeerJS cloud broker for WebRTC signaling (free).
+   * ============================================================ */
+  const MP = {
+    peer: null, conn: null, isHost: false,
+    active: false, myRole: null, // 'host' (p1) | 'guest' (p2)
+    opponentName: null, opponentStyle: null,
+    myName: null, myStyle: null,
+    hostReady: false, guestReady: false,
+
+    loadPeerJS(cb) {
+      if (window.Peer) { cb(); return; }
+      const s = document.createElement('script');
+      s.src = 'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';
+      s.onload = cb;
+      s.onerror = () => {
+        setRoomStatus('⚠️ Could not load PeerJS library. Check your internet connection.', false);
+      };
+      document.head.appendChild(s);
+    },
+
+    createRoom() {
+      this.loadPeerJS(() => {
+        setRoomStatus('Creating room…', false);
+        this.isHost = true;
+        this.myRole = 'host';
+        try {
+          this.peer = new Peer();
+          this.peer.on('open', id => {
+            const shortCode = id;
+            showRoomCode(shortCode);
+            setRoomStatus('⏳ Waiting for opponent to join…', false);
+            document.getElementById('copyCodeBtn').style.display = '';
+            document.getElementById('copyCodeBtn').onclick = () => {
+              navigator.clipboard.writeText(shortCode).then(() => {
+                document.getElementById('copyCodeBtn').textContent = '✅ Copied!';
+                setTimeout(() => { document.getElementById('copyCodeBtn').textContent = '📋 Copy Code'; }, 1500);
+              }).catch(() => {
+                prompt('Copy this code:', shortCode);
+              });
+            };
+          });
+          this.peer.on('connection', conn => {
+            this.conn = conn;
+            this._setupConn(conn);
+          });
+          this.peer.on('error', err => setRoomStatus('Connection error: ' + err.message, false));
+        } catch(e) {
+          setRoomStatus('Error: ' + e.message, false);
+        }
+      });
+    },
+
+    joinRoom(code) {
+      this.loadPeerJS(() => {
+        setRoomStatus('Connecting…', false);
+        this.isHost = false;
+        this.myRole = 'guest';
+        try {
+          this.peer = new Peer();
+          this.peer.on('open', () => {
+            this.conn = this.peer.connect(code.trim());
+            this._setupConn(this.conn);
+          });
+          this.peer.on('error', err => setRoomStatus('Connection error: ' + err.message, false));
+        } catch(e) {
+          setRoomStatus('Error: ' + e.message, false);
+        }
+      });
+    },
+
+    send(data) {
+      if (this.conn && this.conn.open) { try { this.conn.send(data); } catch(e) {} }
+    },
+
+    _setupConn(conn) {
+      conn.on('open', () => {
+        setRoomStatus('<span class="online-connection-dot"></span> Connected!', true);
+        document.getElementById('onlineStylePick').classList.remove('hidden');
+        document.getElementById('joinRoomInput').classList.add('hidden');
+      });
+      conn.on('data', data => this._onMessage(data));
+      conn.on('close', () => {
+        setRoomStatus('<span class="online-connection-dot disconnected"></span> Opponent disconnected.', false);
+        this.active = false;
+        if (S.phase === 'court') {
+          try { Game.courtLog('⚠️ Opponent disconnected. Match ended.', 'bad'); } catch(e) {}
+        }
+      });
+      conn.on('error', err => setRoomStatus('Error: ' + err.message, false));
+    },
+
+    _onMessage(data) {
+      if (data.type === 'READY') {
+        this.opponentName = data.name;
+        this.opponentStyle = data.style;
+        if (this.isHost) { this.hostReady = true; this.guestReady = true; }
+        else { this.guestReady = true; this.hostReady = true; }
+        if (this.hostReady && this.guestReady) this._startOnlineDuel();
+      } else if (data.type === 'DUEL_ACTION') {
+        // Apply opponent's action locally
+        if (!S.duel || S.duel.ended) return;
+        const myTurn = (this.isHost ? 1 : 2);
+        // It's the other player's turn
+        if (S.duel.turn === myTurn) return; // ignore — it's our turn
+        try {
+          if (data.action === 'duel_present') {
+            Game.duelPresent(data.idx);
+          } else {
+            Game.duelAction(data.action);
+          }
+        } catch(e) {}
+        updateOnlineTurnBanner();
+      } else if (data.type === 'SYNC') {
+        // Full state sync from host
+        if (!this.isHost && data.duel) {
+          try {
+            Object.assign(S.duel, data.duel);
+            S.court = Object.assign(S.court || {}, data.court || {});
+            Game.renderDuel && Game.renderDuel();
+          } catch(e) {}
+        }
+        updateOnlineTurnBanner();
+      }
+    },
+
+    _startOnlineDuel() {
+      // Both players have shared their styles — start the duel
+      closeOnlineDuelModal();
+      const p1Name  = this.isHost ? this.myName : this.opponentName;
+      const p1Style = this.isHost ? this.myStyle : this.opponentStyle;
+      const p2Name  = this.isHost ? this.opponentName : this.myName;
+      const p2Style = this.isHost ? this.opponentStyle : this.myStyle;
+
+      // Set up duel UI inputs and trigger startDuel
+      const d1Name = document.getElementById('d1Name');
+      const d2Name = document.getElementById('d2Name');
+      if (d1Name) d1Name.value = p1Name;
+      if (d2Name) d2Name.value = p2Name;
+
+      // Select styles
+      try {
+        document.querySelectorAll('#d1Styles .style-card').forEach(el => el.classList.toggle('selected', el.dataset.style === p1Style));
+        document.querySelectorAll('#d2Styles .style-card').forEach(el => el.classList.toggle('selected', el.dataset.style === p2Style));
+        if (!S.duelSetup) S.duelSetup = { p1: null, p2: null };
+        S.duelSetup = { p1: p1Style, p2: p2Style };
+        const startBtn = document.getElementById('duelStart');
+        if (startBtn) startBtn.disabled = false;
+      } catch(e) {}
+
+      // Navigate to duel setup then start
+      UI.switchTo && UI.switchTo('duel');
+      setTimeout(() => {
+        try { Game.startDuel && Game.startDuel(); } catch(e) {}
+        this.active = true;
+        updateOnlineTurnBanner();
+      }, 200);
+    },
+
+    isMyTurn() {
+      if (!this.active || !S.duel) return true; // solo fallback
+      const myTurnNum = this.isHost ? 1 : 2;
+      return S.duel.turn === myTurnNum;
+    },
+  };
+
+  // ---- Online modal UI helpers ----
+  function openOnlineDuelModal() {
+    document.getElementById('onlineDuelModal').classList.remove('hidden');
+  }
+  function closeOnlineDuelModal() {
+    document.getElementById('onlineDuelModal').classList.add('hidden');
+  }
+  function setRoomStatus(html, connected) {
+    const box = document.getElementById('roomStatusBox');
+    const text = document.getElementById('roomStatusText');
+    if (box) box.classList.remove('hidden');
+    if (text) text.innerHTML = html;
+    _ = connected; // suppress lint
+  }
+  function showRoomCode(code) {
+    const el = document.getElementById('roomCodeDisplay');
+    if (el) { el.textContent = code; el.classList.remove('hidden'); }
+  }
+  function updateOnlineTurnBanner() {
+    if (!MP.active || !S.duel) return;
+    let banner = document.getElementById('onlineTurnBanner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'onlineTurnBanner';
+      banner.className = 'online-turn-banner';
+      const courtEl = document.getElementById('court');
+      if (courtEl) courtEl.insertBefore(banner, courtEl.firstChild);
+    }
+    const isAr = typeof I18N !== 'undefined' && I18N.ar();
+    if (MP.isMyTurn()) {
+      banner.className = 'online-turn-banner online-your-turn';
+      banner.innerHTML = `<span class="online-connection-dot"></span>${isAr ? 'دورك — خطوتك الآن' : 'Your Turn — Make your move'}`;
+      // Enable buttons
+      document.querySelectorAll('#courtActions button, #evidenceRow button').forEach(b => { b.disabled = false; });
+    } else {
+      banner.className = 'online-turn-banner';
+      banner.innerHTML = `<span class="online-connection-dot"></span>${isAr ? 'دور الخصم — انتظر…' : 'Opponent\'s Turn — Waiting…'}`;
+      // Disable our buttons
+      document.querySelectorAll('#courtActions button, #evidenceRow button').forEach(b => { b.disabled = true; });
+    }
+  }
+
+  // Intercept duelAction to sync with peer
+  const _origDuelAction = Game.duelAction && Game.duelAction.bind(Game);
+  if (_origDuelAction) {
+    Game.duelAction = function (action) {
+      if (MP.active && !MP.isMyTurn()) return; // block if not your turn
+      _origDuelAction(action);
+      if (MP.active) {
+        MP.send({ type: 'DUEL_ACTION', action });
+        if (MP.isHost) MP.send({ type: 'SYNC', duel: S.duel, court: S.court });
+        updateOnlineTurnBanner();
+      }
+    };
+  }
+  const _origDuelPresent = Game.duelPresent && Game.duelPresent.bind(Game);
+  if (_origDuelPresent) {
+    Game.duelPresent = function (idx) {
+      if (MP.active && !MP.isMyTurn()) return;
+      _origDuelPresent(idx);
+      if (MP.active) {
+        MP.send({ type: 'DUEL_ACTION', action: 'duel_present', idx });
+        if (MP.isHost) MP.send({ type: 'SYNC', duel: S.duel, court: S.court });
+        updateOnlineTurnBanner();
+      }
+    };
+  }
+
+  // Hook "Online Duel" button
+  document.addEventListener('click', e => {
+    const t = e.target.closest('[data-act]');
+    if (!t) return;
+    if (t.dataset.act === 'online-duel') {
+      e.preventDefault(); e.stopPropagation();
+      openOnlineDuelModal();
+      // Build style grid for online duel
+      const grid = document.getElementById('onlineStyleGrid');
+      if (grid && !grid.children.length && typeof STYLES !== 'undefined') {
+        Object.values(STYLES).forEach(st => {
+          const card = document.createElement('div');
+          card.className = 'style-card';
+          card.dataset.style = st.id;
+          card.innerHTML = `<h3>${st.name}</h3><div style="font-size:11px;color:var(--ink-dim)">${st.desc}</div>`;
+          card.onclick = () => {
+            grid.querySelectorAll('.style-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            MP.myStyle = st.id;
+            const readyBtn = document.getElementById('onlineReadyBtn');
+            if (readyBtn) readyBtn.disabled = !MP.myStyle;
+          };
+          grid.appendChild(card);
+        });
+      }
+    }
+  }, true);
+
+  document.getElementById('onlineModalClose').addEventListener('click', closeOnlineDuelModal);
+
+  document.getElementById('createRoomBtn').addEventListener('click', () => {
+    document.getElementById('createRoomBtn').disabled = true;
+    document.getElementById('joinRoomBtn').disabled = true;
+    document.getElementById('roomStatusBox').classList.remove('hidden');
+    MP.createRoom();
+  });
+
+  document.getElementById('joinRoomBtn').addEventListener('click', () => {
+    document.getElementById('joinRoomInput').classList.remove('hidden');
+    document.getElementById('createRoomBtn').disabled = true;
+    document.getElementById('joinRoomBtn').disabled = true;
+  });
+
+  document.getElementById('connectRoomBtn').addEventListener('click', () => {
+    const code = document.getElementById('roomCodeInput').value.trim();
+    if (!code) { alert('Enter the room code first.'); return; }
+    document.getElementById('roomStatusBox').classList.remove('hidden');
+    MP.joinRoom(code);
+  });
+
+  document.getElementById('onlineReadyBtn').addEventListener('click', () => {
+    const nameEl = document.getElementById('onlineNameInput');
+    MP.myName = (nameEl && nameEl.value.trim()) || 'Anonymous';
+    if (!MP.myStyle) { alert('Pick a style first.'); return; }
+    document.getElementById('onlineReadyBtn').disabled = true;
+    document.getElementById('onlineReadyBtn').textContent = '⏳ Waiting for opponent…';
+    MP.send({ type: 'READY', name: MP.myName, style: MP.myStyle });
+    if (MP.isHost) MP.hostReady = true; else MP.guestReady = true;
+    if (MP.hostReady && MP.guestReady) MP._startOnlineDuel();
+  });
+
+  console.log('[Suits Improvements v3] loaded — testimony fix, daily themes, campaign shuffle, visits, shop, settlement UI, career overlay, home UI, full Arabic, cutscenes, body language, smart opponent, settlement lines, online multiplayer.');
 })();
