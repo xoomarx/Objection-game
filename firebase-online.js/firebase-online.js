@@ -213,23 +213,33 @@
   const oldHandleAct = window.Game && Game.handleAct ? Game.handleAct.bind(Game) : null;
 
   function patchGame() {
-    if (!window.Game || !Game.handleAct || Game.__firebaseOnlinePatched) return;
+  if (!window.Game || !Game.handleAct || Game.__firebaseOnlinePatched) return;
 
-    Game.__firebaseOnlinePatched = true;
+  Game.__firebaseOnlinePatched = true;
 
-    const originalHandleAct = Game.handleAct.bind(Game);
-    Game.handleAct = function (act, btn, e) {
-      if (act === "online-duel") {
-        OnlineFirebase.showPanel();
-        return;
+  const originalHandleAct = Game.handleAct.bind(Game);
+  Game.handleAct = function (act, btn, e) {
+    if (act === "online-duel") {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
       }
-      return originalHandleAct(act, btn, e);
-    };
-  }
+      OnlineFirebase.showPanel();
+      return;
+    }
+    return originalHandleAct(act, btn, e);
+  };
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", patchGame);
-  } else {
-    patchGame();
-  }
-})();
+  document.addEventListener("click", function (e) {
+    const t = e.target.closest("[data-act]");
+    if (!t) return;
+
+    if (t.dataset.act === "online-duel") {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+      OnlineFirebase.showPanel();
+    }
+  }, true);
+}

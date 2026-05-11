@@ -2222,4 +2222,7 @@ body.lang-ar .case-stamp { transform: rotate(2deg); }
   .cutscene-title { font-size: 26px; }
   .cutscene-icon { font-size: 54px; }
 }
+#onlineDuelModal {
+  display: none !important;
+}
 
