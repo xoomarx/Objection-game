@@ -1271,3 +1271,240 @@ button[data-act="summon-witness"].disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* ===== Improvements v2 — New UI Elements ===== */
+
+/* Witness mood badge */
+.witness-mood-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  padding: 3px 10px;
+  border: 1.5px solid var(--gold);
+  border-radius: 3px;
+  color: var(--gold);
+  background: rgba(0,0,0,0.3);
+  margin-bottom: 6px;
+  transition: color .2s, border-color .2s;
+  text-transform: uppercase;
+}
+.witness-mood-badge.mood-rattled {
+  animation: slowPulse 1.2s infinite;
+  border-style: dashed;
+}
+
+/* Witness hidden traits panel */
+.witness-traits-panel {
+  font-size: 10px;
+  font-family: 'Courier New', monospace;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(212,168,44,0.2);
+  border-radius: 3px;
+  padding: 5px 8px;
+  margin: 4px 0 8px;
+  color: var(--ink-dim);
+  letter-spacing: 0.5px;
+}
+.trait-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 2px 0;
+  line-height: 1.3;
+}
+.trait-label {
+  color: var(--ink-dim);
+  min-width: 70px;
+}
+.trait-value {
+  color: var(--gold);
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+.trait-bar {
+  color: var(--gold);
+  letter-spacing: 0px;
+  font-size: 9px;
+}
+
+/* Press Witness button */
+.press-witness-btn {
+  background: linear-gradient(135deg, #3a2d52, #5a3d70);
+  color: var(--ink);
+  border-color: #9a5ad4;
+  font-weight: bold;
+}
+.press-witness-btn:hover:not(:disabled) {
+  filter: brightness(1.18);
+  box-shadow: 0 0 8px rgba(154,90,212,0.5);
+}
+.press-witness-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Last-Chance Objection header */
+.last-chance-header {
+  text-align: center;
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: #ff7b7b;
+  text-transform: uppercase;
+  padding: 8px 0 4px;
+  animation: slowPulse 0.8s infinite;
+}
+.last-chance-btn {
+  border-color: #ff7b7b !important;
+  background: rgba(212,74,58,0.15) !important;
+  color: #ff9e8e !important;
+  font-weight: bold !important;
+  animation: pulseTrap 0.8s infinite !important;
+}
+
+/* Combo toast */
+.combo-toast {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.7);
+  background: rgba(0,0,0,0.8);
+  border: 2px solid var(--toast-color, var(--gold));
+  color: var(--toast-color, var(--gold));
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  padding: 8px 22px;
+  border-radius: 4px;
+  pointer-events: none;
+  opacity: 0;
+  text-shadow: 0 0 8px var(--toast-color, var(--gold));
+  z-index: 50;
+  white-space: nowrap;
+  transition: none;
+}
+.combo-toast-active {
+  animation: comboPop 1.6s ease forwards;
+}
+@keyframes comboPop {
+  0%   { opacity: 0; transform: translateX(-50%) scale(0.7); }
+  12%  { opacity: 1; transform: translateX(-50%) scale(1.12); }
+  30%  { opacity: 1; transform: translateX(-50%) scale(1.0); }
+  75%  { opacity: 1; transform: translateX(-50%) scale(1.0); }
+  100% { opacity: 0; transform: translateX(-50%) scale(0.85) translateY(-12px); }
+}
+
+/* Daily case button */
+.daily-case-btn {
+  background: linear-gradient(135deg, #1a2a0a, #2a4a18);
+  color: #aaffaa;
+  border-color: #5aaa4a;
+  font-weight: bold;
+}
+.daily-case-btn:hover:not(:disabled) {
+  filter: brightness(1.15);
+  box-shadow: 0 0 8px rgba(90,170,74,0.4);
+}
+
+/* Time pressure toggle button accent */
+button[data-act="toggle-time-pressure"] {
+  border-color: #d4a82c;
+  font-size: 12px;
+}
+
+/* Time Pressure countdown bar */
+.tp-bar-wrap {
+  position: relative;
+  height: 6px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.tp-bar-fill {
+  height: 100%;
+  width: 100%;
+  border-radius: 3px;
+  transition: width 0.9s linear, background 0.4s;
+  background: #5aaa4a;
+}
+.tp-bar-label {
+  position: absolute;
+  right: 4px;
+  top: -14px;
+  font-size: 10px;
+  color: var(--ink-dim);
+  letter-spacing: 1px;
+  pointer-events: none;
+}
+
+/* Enhanced verdict screen */
+.verdict-extended {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(212,168,44,0.2);
+}
+.verdict-grade {
+  font-family: 'Georgia', serif;
+  font-size: 52px;
+  font-weight: bold;
+  text-align: center;
+  line-height: 1;
+  text-shadow: 0 0 20px currentColor;
+  margin-bottom: 6px;
+}
+.verdict-stats-grid {
+  font-size: 11px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 4px;
+  padding: 6px 10px;
+  margin: 6px 0;
+}
+.vs-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: var(--ink-dim);
+}
+.vs-row:last-child { border-bottom: none; }
+.vs-row span:last-child { color: var(--ink); font-weight: bold; }
+.verdict-rank-badge {
+  text-align: center;
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--gold-bright);
+  letter-spacing: 1px;
+  margin: 8px 0 4px;
+  padding: 6px;
+  border: 1px solid rgba(212,168,44,0.3);
+  border-radius: 4px;
+  background: rgba(212,168,44,0.06);
+}
+.rank-sub {
+  display: block;
+  font-size: 10px;
+  color: var(--ink-dim);
+  font-weight: normal;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+.verdict-perks {
+  font-size: 10px;
+  color: var(--ink-dim);
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* Court section: make room for injected elements */
+#court {
+  position: relative;
+}
+
+/* Mobile: hide traits panel on very small screens */
+@media (max-width: 420px) {
+  .witness-traits-panel { display: none; }
+  .combo-toast { font-size: 12px; padding: 6px 14px; }
+  .verdict-grade { font-size: 36px; }
+}
