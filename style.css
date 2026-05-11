@@ -1508,3 +1508,133 @@ button[data-act="toggle-time-pressure"] {
   .combo-toast { font-size: 12px; padding: 6px 14px; }
   .verdict-grade { font-size: 36px; }
 }
+
+/* ===== Court Log — Dialogue Mode ===== */
+
+/* Speech lines: character dialogue, prominent */
+#courtLog .entry.log-speech {
+  background: rgba(212,168,44,0.07);
+  border-left: 3px solid var(--gold);
+  padding: 6px 10px 6px 10px;
+  margin: 3px 0;
+  border-radius: 3px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.4;
+  position: relative;
+}
+#courtLog .entry.log-speech::before {
+  content: '💬';
+  font-size: 10px;
+  position: absolute;
+  left: -18px;
+  top: 7px;
+  opacity: 0.7;
+}
+#courtLog .entry.ai.log-speech {
+  border-left-color: #d44a3a;
+  background: rgba(212,74,58,0.07);
+}
+
+/* System/mechanic lines: dimmed but still readable */
+#courtLog .entry.log-system {
+  font-size: 11px;
+  color: var(--ink-dim);
+  opacity: 0.65;
+  padding: 2px 4px;
+  border-left: 2px solid rgba(255,255,255,0.06);
+  margin: 1px 0;
+}
+#courtLog .entry.log-system.bad { color: #ff9e8e; opacity: 0.75; }
+#courtLog .entry.log-system.good { color: #aaffaa; opacity: 0.75; }
+#courtLog .entry.log-system.drama { opacity: 0.8; color: var(--gold); }
+
+/* Log toggle button */
+.log-toggle-btn {
+  display: block;
+  font-size: 11px;
+  padding: 4px 10px;
+  margin-bottom: 6px;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(212,168,44,0.3);
+  border-radius: 3px;
+  color: var(--ink-dim);
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: border-color .15s, color .15s;
+}
+.log-toggle-btn:hover { border-color: var(--gold); color: var(--gold); }
+.log-toggle-active { border-color: var(--gold) !important; color: var(--gold) !important; background: rgba(212,168,44,0.08) !important; }
+
+/* ===== Statement Box — Testimony Display ===== */
+
+/* Statement counter / header */
+.stmt-counter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  border-bottom: 1px solid rgba(212,168,44,0.2);
+  padding-bottom: 5px;
+  margin-bottom: 6px;
+}
+.stmt-num {
+  color: var(--gold);
+  font-weight: bold;
+}
+.stmt-resolved {
+  color: #5aaa4a;
+  font-size: 9px;
+}
+
+/* Typewriter cursor blink while typing */
+.statement .quote.typing::after {
+  content: '▌';
+  animation: blink .55s step-end infinite;
+  color: var(--gold);
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Make the statement quote text slightly larger and more readable */
+.statement .quote {
+  font-size: 15px;
+  line-height: 1.55;
+  font-style: italic;
+  color: var(--ink);
+  letter-spacing: 0.3px;
+}
+
+/* Who-is-talking label — bolder, colored */
+.statement .who {
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 4px;
+}
+
+/* Hint line — more prominent */
+.statement .hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #ffd580;
+  background: rgba(212,168,44,0.08);
+  padding: 5px 8px;
+  border-left: 3px solid var(--gold);
+  border-radius: 2px;
+  animation: slowPulse 2s infinite;
+}
+
+@media (max-width: 420px) {
+  .stmt-counter { font-size: 9px; }
+  .statement .quote { font-size: 13px; }
+  #courtLog .entry.log-speech { font-size: 12px; }
+  #courtLog .entry.log-speech::before { display: none; }
+}

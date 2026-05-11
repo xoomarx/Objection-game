@@ -1484,5 +1484,166 @@
     }, 600);
   }
 
-  console.log('[Suits Improvements v2] loaded — witness personalities, press action, hidden traits, 11 new themes, last-chance objection, combo chains, atmospheric text, daily case, enhanced verdict, career ranks, time pressure mode.');
+  /* ============================================================
+   * 18) VOICE DELAY FIX
+   * Speech now waits 800ms after text appears so you can read
+   * before hearing the voice. Interrupt still cancels immediately.
+   * ============================================================ */
+  if (Snd && Snd.speak) {
+    const _origSndSpeak = Snd.speak.bind(Snd);
+    Snd.speak = function (text, role, interrupt) {
+      if (interrupt) {
+        try { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); } catch(e) {}
+      }
+      setTimeout(() => {
+        try { _origSndSpeak.call(Snd, text, role, false); } catch(e) {}
+      }, 850);
+    };
+  }
+
+  /* ============================================================
+   * 19) COURT LOG — DIALOGUE MODE
+   * Character speech gets speech-bubble styling.
+   * System/mechanics messages are dimmed so dialogue stands out.
+   * A "Show All / Dialogue Only" toggle lets you filter the log.
+   * ============================================================ */
+  let _dialogueOnly = false;
+
+  function isSpeechLine(text, kind) {
+    if (kind === 'ai') return true;
+    // Name: "quote" pattern — covers opponent rebuttals, witness lines, player dramatic lines
+    if (/^[A-ZÀ-Ÿ][a-zA-ZÀ-Ÿ.\s]{1,28}:\s*["'"❝]/.test(text)) return true;
+    // Courtroom atmospheric commentary is NOT speech
+    if (/^〔/.test(text)) return false;
+    // Judge/court system messages
+    if (/^(Court is now|💡|🔍 Demeanor|⏱|⚡|📌|🎙️|🔷|✓|✗|Judge|Recess|Closing|PRESS|PIN DOWN|Cross|Expose|Grandstand|Second Chair|Calm|Focus|Combo|Adrenaline)/i.test(text)) return false;
+    return false;
+  }
+
+  // Intercept UI.log after game.js defined it
+  const _origUILog = UI.log.bind(UI);
+  UI.log = function (boxId, text, kind) {
+    _origUILog(boxId, text, kind);
+    if (boxId !== 'courtLog') return;
+    const box = document.getElementById(boxId);
+    if (!box) return;
+    const entry = box.lastElementChild;
+    if (!entry) return;
+    const isSpeech = isSpeechLine(text, kind);
+    if (isSpeech) {
+      entry.classList.add('log-speech');
+    } else {
+      entry.classList.add('log-system');
+      if (_dialogueOnly) entry.style.display = 'none';
+    }
+  };
+
+  // Inject dialogue toggle button above the court log
+  function injectLogToggle() {
+    const log = document.getElementById('courtLog');
+    if (!log || document.getElementById('logToggleBtn')) return;
+    const btn = document.createElement('button');
+    btn.id = 'logToggleBtn';
+    btn.className = 'log-toggle-btn';
+    btn.textContent = '💬 Dialogue Only';
+    btn.title = 'Show only character speech';
+    btn.onclick = () => {
+      _dialogueOnly = !_dialogueOnly;
+      btn.textContent = _dialogueOnly ? '📋 Show All' : '💬 Dialogue Only';
+      btn.classList.toggle('log-toggle-active', _dialogueOnly);
+      document.querySelectorAll('#courtLog .log-system').forEach(el => {
+        el.style.display = _dialogueOnly ? 'none' : '';
+      });
+    };
+    log.parentNode.insertBefore(btn, log);
+  }
+
+  const _origRenderCourt4 = Game.renderCourt.bind(Game);
+  Game.renderCourt = function () {
+    _origRenderCourt4();
+    injectLogToggle();
+    updateStatementCounter();
+  };
+
+  /* ============================================================
+   * 20) STATEMENT BOX — CLEARER TESTIMONY DISPLAY
+   * Adds statement number, testimony header, and a subtle
+   * typewriter reveal when moving to a new statement.
+   * ============================================================ */
+  let _lastRenderedStmtIdx = -1;
+
+  function updateStatementCounter() {
+    const c = S.court;
+    if (!c || !S.caseData) return;
+
+    // Statement counter badge
+    let counter = document.getElementById('stmtCounter');
+    if (!counter) {
+      counter = document.createElement('div');
+      counter.id = 'stmtCounter';
+      counter.className = 'stmt-counter';
+      const whoTalking = document.getElementById('whoTalking');
+      if (whoTalking && whoTalking.parentNode) {
+        whoTalking.parentNode.insertBefore(counter, whoTalking);
+      }
+    }
+    const stmts = S.caseData.statements || [];
+    const total = stmts.length;
+    const idx = c.statementIdx || 0;
+    const current = Math.min(idx + 1, total);
+    const resolved = c.statementsResolved || 0;
+    counter.innerHTML = `<span class="stmt-num">TESTIMONY ${current} / ${total}</span><span class="stmt-resolved">${resolved} broken</span>`;
+
+    // Typewriter effect on new statement
+    const stmtEl = document.getElementById('statementText');
+    if (stmtEl && idx !== _lastRenderedStmtIdx && stmts[idx]) {
+      _lastRenderedStmtIdx = idx;
+      const fullText = `"${stmts[idx].text}"`;
+      stmtEl.textContent = '';
+      stmtEl.classList.add('typing');
+      let i = 0;
+      const tick = setInterval(() => {
+        stmtEl.textContent = fullText.slice(0, ++i);
+        if (i >= fullText.length) {
+          clearInterval(tick);
+          stmtEl.classList.remove('typing');
+        }
+      }, 22);
+    }
+  }
+
+  /* ============================================================
+   * 21) REMOVE "Random Case Generator" — ABSORBED INTO CAMPAIGN
+   * Start Campaign already runs rebuildCampaignDeck() which
+   * mixes fixed + procedural cases. The dedicated button is gone.
+   * ============================================================ */
+  function hideRandomCaseBtn() {
+    document.querySelectorAll('[data-act="random-case"]').forEach(btn => {
+      btn.style.display = 'none';
+    });
+  }
+
+  // Hide on load and after every return to menu
+  try { hideRandomCaseBtn(); } catch(e) {}
+  const _origToMenu3 = Game.toMenu && Game.toMenu.bind(Game);
+  if (_origToMenu3) {
+    Game.toMenu = function () {
+      clearTimerBar();
+      _origToMenu3();
+      setTimeout(() => {
+        injectDailyButton();
+        buildTimePressureToggle();
+        hideRandomCaseBtn();
+      }, 120);
+    };
+  }
+
+  // Also remove it via CSS as a belt-and-suspenders approach
+  (function injectHideRandom() {
+    const s = document.createElement('style');
+    s.textContent = 'button[data-act="random-case"] { display: none !important; }';
+    document.head.appendChild(s);
+  })();
+
+  console.log('[Suits Improvements v2] loaded — voice delay, dialogue log mode, statement counter, 11 themes, witness moods, press, traits, last-chance, combo chains, daily case, verdict, career ranks, time pressure, random case integrated into campaign.');
 })();
