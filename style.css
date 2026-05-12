@@ -2639,7 +2639,7 @@ body.lang-ar .case-stamp { transform: rotate(2deg); }
   }
 
   .court-left-col {
-    flex: 0 0 460px;
+    flex: 0 0 560px;
     position: sticky;
     top: 4px;
     max-height: calc(100vh - 54px);
@@ -2647,14 +2647,14 @@ body.lang-ar .case-stamp { transform: rotate(2deg); }
   }
 
   .court-left-col #courtCanvasWrap canvas {
-    width: 460px;
+    width: 560px;
     height: auto;
     display: block;
   }
 
   .court-right-col {
     flex: 1 1 0;
-    min-width: 0;
+    min-width: 260px;
     max-height: calc(100vh - 54px);
     overflow-y: auto;
     padding-right: 4px;
@@ -2664,6 +2664,36 @@ body.lang-ar .case-stamp { transform: rotate(2deg); }
   .court-right-col::-webkit-scrollbar { width: 4px; }
   .court-right-col::-webkit-scrollbar-track { background: var(--bg-1); }
   .court-right-col::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 2px; }
+}
+
+/* Statement box when inside the left column (below canvas) */
+.court-left-col .statement {
+  margin-top: 0;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  border: 2px solid var(--bg-3);
+  border-top: 3px solid var(--gold);
+  background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg-1) 100%);
+  padding: 10px 14px 12px;
+}
+.court-left-col .statement .who {
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: var(--gold);
+  margin-bottom: 4px;
+}
+.court-left-col .statement .quote {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink);
+  font-style: italic;
+}
+.court-left-col .statement .hint {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--gold);
+  border-top: 1px solid var(--bg-3);
+  padding-top: 5px;
 }
 
 /* ============================================================

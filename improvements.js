@@ -3476,27 +3476,357 @@
 
 
 /* ============================================================
- * VISUAL & UI ENHANCEMENTS
- * Wraps the original drawCourtroom to add extras on top:
- * duel turn glow, speech bubble, homepage gold particles.
- * Does NOT replace the original — fixes the previous bug.
+ * VISUAL & UI ENHANCEMENTS v2
+ * Draws a richly detailed courtroom BEFORE the original call
+ * (gallery, columns, seal, ceiling) then draws foreground FX
+ * AFTER the original (lighting shafts, dust, mood effects,
+ * vignette, papers, nameplate, speech bubble, duel glow).
  * ============================================================ */
 (function visualEnhancements() {
   if (typeof Canvas === 'undefined') return;
 
-  /* Wrap original drawCourtroom — call it first, then overlay extras */
   const _origDrawCourtroom = Canvas.drawCourtroom.bind(Canvas);
+
+  /* ── Background helpers (drawn BEFORE original so characters appear on top) ── */
+
+  function drawCeilingAndRailing(ctx) {
+    // Deep ceiling strip
+    ctx.fillStyle = '#100820';
+    ctx.fillRect(0, 0, 800, 32);
+    // Ceiling light panels (recessed rectangular lights)
+    var panelPositions = [70, 210, 350, 450, 590, 730];
+    panelPositions.forEach(function(px) {
+      // Outer frame
+      ctx.strokeStyle = 'rgba(180,140,60,0.28)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(px, 4, 90, 22);
+      // Inner glow fill
+      var lg = ctx.createLinearGradient(px, 4, px, 26);
+      lg.addColorStop(0, 'rgba(255,240,190,0.13)');
+      lg.addColorStop(1, 'rgba(255,220,140,0.04)');
+      ctx.fillStyle = lg;
+      ctx.fillRect(px + 1, 5, 88, 20);
+      // Warm glow pool below
+      ctx.globalAlpha = 0.07;
+      var gg = ctx.createRadialGradient(px + 45, 26, 0, px + 45, 26, 60);
+      gg.addColorStop(0, '#fff4c0'); gg.addColorStop(1, 'transparent');
+      ctx.fillStyle = gg;
+      ctx.fillRect(px - 20, 10, 130, 70);
+      ctx.globalAlpha = 1;
+    });
+    // Crown moulding strip
+    ctx.fillStyle = '#2c1f0d';
+    ctx.fillRect(0, 30, 800, 7);
+    ctx.fillStyle = '#3d2a10';
+    ctx.fillRect(0, 36, 800, 3);
+    // Gallery railing (horizontal rail across the back wall)
+    ctx.fillStyle = '#5c3d1a';
+    ctx.fillRect(130, 64, 540, 5);
+    ctx.fillStyle = '#7a5428';
+    ctx.fillRect(130, 64, 540, 2);
+    // Railing balusters
+    for (var bx = 140; bx < 670; bx += 22) {
+      ctx.fillStyle = 'rgba(80,52,22,0.7)';
+      ctx.fillRect(bx, 42, 4, 22);
+    }
+  }
+
+  function drawGalleryCrowd(ctx, frame) {
+    // Second row (far back, smaller, partially hidden by railing)
+    var row2 = [155, 195, 240, 290, 340, 400, 460, 510, 560, 605, 650];
+    row2.forEach(function(hx, i) {
+      var bob = Math.sin(frame * 0.038 + i * 1.4 + 0.5) * 0.7;
+      ctx.fillStyle = 'rgba(8, 4, 18, 0.55)';
+      ctx.beginPath(); ctx.ellipse(hx, 42 + bob, 7, 9, 0, 0, Math.PI * 2); ctx.fill();
+    });
+    // Main gallery row (larger silhouettes just above railing)
+    var row1 = [148, 192, 240, 286, 336, 380, 430, 476, 522, 568, 614, 658];
+    row1.forEach(function(hx, i) {
+      var bob = Math.sin(frame * 0.045 + i * 1.1) * 1.1;
+      var shade = 12 + ((i * 17) % 14);
+      ctx.fillStyle = 'rgba(' + shade + ',' + (shade / 2 | 0) + ',' + (shade * 2 | 0) + ',0.78)';
+      // Head
+      ctx.beginPath(); ctx.ellipse(hx, 55 + bob, 9, 12, 0, 0, Math.PI * 2); ctx.fill();
+      // Shoulders
+      ctx.beginPath(); ctx.ellipse(hx, 70 + bob, 14, 7, 0, Math.PI, 0); ctx.fill();
+      // Occasional person leaning / whispering animation
+      if (i % 3 === 1 && Math.sin(frame * 0.02 + i) > 0.7) {
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath(); ctx.ellipse(hx + 9, 54 + bob, 6, 8, 0.3, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    });
+  }
+
+  function drawCourtSeal(ctx, cx, cy) {
+    // Background disc
+    ctx.fillStyle = 'rgba(20,10,40,0.6)';
+    ctx.beginPath(); ctx.arc(cx, cy, 26, 0, Math.PI * 2); ctx.fill();
+    // Outer ring
+    ctx.strokeStyle = 'rgba(212,168,44,0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(cx, cy, 25, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(212,168,44,0.22)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, 20, 0, Math.PI * 2); ctx.stroke();
+    // Sun rays
+    for (var r = 0; r < 16; r++) {
+      var a = r * Math.PI / 8;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * 16, cy + Math.sin(a) * 16);
+      ctx.lineTo(cx + Math.cos(a) * 23, cy + Math.sin(a) * 23);
+      ctx.strokeStyle = 'rgba(212,168,44,' + (r % 2 === 0 ? '0.4' : '0.2') + ')';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    // Scale icon
+    ctx.fillStyle = 'rgba(212,168,44,0.7)';
+    ctx.font = '13px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('⚖', cx, cy + 4);
+    ctx.font = '5px Courier New';
+    ctx.fillStyle = 'rgba(212,168,44,0.5)';
+    ctx.fillText('COURT OF LAW', cx, cy + 17);
+    ctx.textAlign = 'left';
+  }
+
+  function drawColumns(ctx) {
+    function oneColumn(x) {
+      // Shadow behind column
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.fillRect(x + 4, 42, 10, 190);
+      // Main shaft
+      var cg = ctx.createLinearGradient(x, 0, x + 18, 0);
+      cg.addColorStop(0, 'rgba(55,36,14,0.65)');
+      cg.addColorStop(0.4, 'rgba(95,65,28,0.75)');
+      cg.addColorStop(1, 'rgba(40,26,10,0.55)');
+      ctx.fillStyle = cg;
+      ctx.fillRect(x, 42, 18, 192);
+      // Capital (top) and base
+      ctx.fillStyle = 'rgba(110,76,34,0.75)';
+      ctx.fillRect(x - 3, 39, 24, 8);
+      ctx.fillRect(x - 3, 230, 24, 8);
+      ctx.fillStyle = 'rgba(130,90,40,0.55)';
+      ctx.fillRect(x - 1, 40, 20, 3);
+      // Fluting shadows
+      for (var fl = 0; fl < 3; fl++) {
+        ctx.fillStyle = 'rgba(0,0,0,0.15)';
+        ctx.fillRect(x + 3 + fl * 4, 50, 2, 178);
+      }
+    }
+    oneColumn(108);
+    oneColumn(674);
+  }
+
+  function drawWallDetails(ctx) {
+    // Wainscoting panels on the side walls
+    // Left wall panel
+    ctx.strokeStyle = 'rgba(80,55,22,0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(4, 75, 106, 165);
+    ctx.strokeRect(8, 80, 98, 155);
+    // Right wall panel
+    ctx.strokeRect(690, 75, 106, 165);
+    ctx.strokeRect(694, 80, 98, 155);
+    // Decorative horizontal rails
+    ctx.fillStyle = 'rgba(90,62,24,0.3)';
+    ctx.fillRect(4, 128, 104, 3);
+    ctx.fillRect(690, 128, 106, 3);
+    ctx.fillRect(4, 188, 104, 3);
+    ctx.fillRect(690, 188, 106, 3);
+  }
+
+  /* ── Foreground helpers (drawn AFTER original, on top) ── */
+
+  function drawWindowLightShafts(ctx, frame) {
+    var t = frame * 0.014;
+    // Left shaft (angled down-right from top-left window)
+    ctx.globalAlpha = 0.055 + 0.018 * Math.sin(t);
+    var g1 = ctx.createLinearGradient(0, 35, 200, 290);
+    g1.addColorStop(0, '#ffe898'); g1.addColorStop(0.6, 'rgba(255,232,152,0.3)'); g1.addColorStop(1, 'transparent');
+    ctx.fillStyle = g1;
+    ctx.beginPath();
+    ctx.moveTo(2, 35); ctx.lineTo(200, 290); ctx.lineTo(120, 290); ctx.lineTo(2, 75);
+    ctx.closePath(); ctx.fill();
+    // Right shaft
+    ctx.globalAlpha = 0.048 + 0.016 * Math.sin(t + 2.1);
+    var g2 = ctx.createLinearGradient(800, 35, 600, 290);
+    g2.addColorStop(0, '#ffe898'); g2.addColorStop(0.6, 'rgba(255,232,152,0.3)'); g2.addColorStop(1, 'transparent');
+    ctx.fillStyle = g2;
+    ctx.beginPath();
+    ctx.moveTo(798, 35); ctx.lineTo(600, 290); ctx.lineTo(680, 290); ctx.lineTo(798, 75);
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawDustMotes(ctx, frame) {
+    for (var d = 0; d < 12; d++) {
+      var dx = ((frame * 0.22 + d * 71) % 680) + 60;
+      var dy = ((frame * 0.07 + d * 43) % 230) + 25;
+      ctx.globalAlpha = 0.12 + 0.28 * Math.abs(Math.sin(frame * 0.025 + d * 0.8));
+      ctx.fillStyle = '#fff6d0';
+      ctx.fillRect(dx | 0, dy | 0, 1, 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawPodiumPapers(ctx) {
+    // Stack of papers at left podium (190-260 x, 287-320 y)
+    [[192, 285, 26, '#f5e8c8'], [189, 281, 22, '#f0e2be'], [193, 277, 17, '#ead8b0']].forEach(function(p) {
+      ctx.fillStyle = p[3];
+      ctx.globalAlpha = 0.88;
+      ctx.fillRect(p[0], p[1], p[2], 3);
+    });
+    // Brief/notepad at right podium (552-624 x)
+    [[553, 285, 26, '#f5e8c8'], [550, 281, 22, '#f0e2be'], [554, 277, 17, '#ead8b0']].forEach(function(p) {
+      ctx.fillStyle = p[3];
+      ctx.globalAlpha = 0.88;
+      ctx.fillRect(p[0], p[1], p[2], 3);
+    });
+    // Tiny pen at right podium
+    ctx.fillStyle = '#2a1a0a';
+    ctx.globalAlpha = 0.75;
+    ctx.fillRect(576, 283, 1, 8);
+    ctx.globalAlpha = 1;
+  }
+
+  function drawWitnessNameplate(ctx) {
+    var wname = S.caseData && S.caseData.witness && S.caseData.witness.name;
+    if (!wname) return;
+    // Wooden nameplate bar on witness stand
+    ctx.fillStyle = 'rgba(80,52,18,0.85)';
+    ctx.fillRect(340, 291, 76, 12);
+    ctx.fillStyle = 'rgba(212,168,44,0.9)';
+    ctx.fillRect(341, 292, 74, 10);
+    ctx.fillStyle = '#1a0a2a';
+    ctx.font = 'bold 6px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText(wname.toUpperCase().substring(0, 13), 378, 299);
+    ctx.textAlign = 'left';
+  }
+
+  function drawCourtReporter(ctx) {
+    // Tiny court reporter figure at bottom-center between podiums
+    var rx = 388, ry = 305;
+    // Chair
+    ctx.fillStyle = '#3a2808';
+    ctx.fillRect(rx - 6, ry + 6, 12, 4);
+    // Body
+    ctx.fillStyle = '#1a1228';
+    ctx.fillRect(rx - 4, ry - 2, 8, 10);
+    // Head
+    ctx.fillStyle = '#c8a070';
+    ctx.beginPath(); ctx.arc(rx, ry - 5, 4, 0, Math.PI * 2); ctx.fill();
+    // Laptop/stenograph
+    ctx.fillStyle = '#888';
+    ctx.fillRect(rx - 8, ry + 2, 16, 2);
+    ctx.fillStyle = '#555';
+    ctx.fillRect(rx - 7, ry - 1, 14, 3);
+  }
+
+  function drawVignette(ctx) {
+    var vig = ctx.createRadialGradient(400, 180, 100, 400, 180, 450);
+    vig.addColorStop(0, 'transparent');
+    vig.addColorStop(0.7, 'rgba(0,0,0,0.08)');
+    vig.addColorStop(1, 'rgba(0,0,0,0.55)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, 800, 360);
+  }
+
+  function drawCharMoodFx(ctx, cs, frame) {
+    if (!cs) return;
+    _moodFx(ctx, cs.player,  228, 208, frame, 0);
+    _moodFx(ctx, cs.opp,     572, 208, frame, 1);
+    _moodFx(ctx, cs.witness, 390, 178, frame, 2);
+  }
+
+  function _moodFx(ctx, state, x, y, f, seed) {
+    if (!state || state === 'neutral') return;
+    if (state === 'triumphant') {
+      for (var i = 0; i < 6; i++) {
+        var a = (f * 0.042 + i * 1.047) % (Math.PI * 2);
+        var r = 17 + 4 * Math.sin(f * 0.055 + i);
+        ctx.globalAlpha = 0.5 + 0.4 * Math.sin(f * 0.065 + i);
+        ctx.fillStyle = i % 2 === 0 ? '#ffdc5c' : '#fff4a0';
+        ctx.fillRect((x + Math.cos(a) * r) | 0, (y + Math.sin(a) * r * 0.55) | 0, 3, 3);
+      }
+    } else if (state === 'rattled') {
+      ctx.fillStyle = '#88d8f8';
+      for (var j = 0; j < 3; j++) {
+        var sy = ((f * 1.6 + j * 26) % 40);
+        ctx.globalAlpha = 0.75 - sy / 55;
+        ctx.beginPath(); ctx.arc(x - 5 + j * 5, y + sy, 2.5, 0, Math.PI * 2); ctx.fill();
+      }
+    } else if (state === 'panicking') {
+      ctx.strokeStyle = '#f06060'; ctx.lineWidth = 1.5;
+      for (var k = 0; k < 5; k++) {
+        var lx = x - 14 + k * 7;
+        var jitter = Math.sin(f * 0.45 + k) * 2.5;
+        ctx.globalAlpha = 0.5 + 0.35 * Math.sin(f * 0.35 + k);
+        ctx.beginPath();
+        ctx.moveTo(lx + jitter, y - 12);
+        ctx.lineTo(lx - jitter + 2, y + 10);
+        ctx.stroke();
+      }
+    } else if (state === 'smug') {
+      for (var m = 0; m < 4; m++) {
+        var ma = (f * 0.033 + m * 1.571) % (Math.PI * 2);
+        var mr = 14 + 3 * Math.sin(f * 0.05 + m);
+        ctx.globalAlpha = 0.38 + 0.3 * Math.sin(f * 0.06 + m);
+        ctx.fillStyle = '#3af4c0';
+        ctx.fillRect((x + Math.cos(ma) * mr) | 0, (y + Math.sin(ma) * mr * 0.5) | 0, 3, 3);
+      }
+    } else if (state === 'broken') {
+      ctx.setLineDash([2, 3]); ctx.lineWidth = 1;
+      for (var n = 0; n < 7; n++) {
+        var ba = n * (Math.PI / 3.5);
+        var bl = 10 + Math.sin(f * 0.02 + n) * 4;
+        ctx.globalAlpha = 0.3 + 0.18 * Math.sin(f * 0.015 + n);
+        ctx.strokeStyle = '#707070';
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + Math.cos(ba) * bl, y + Math.sin(ba) * bl);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
+    ctx.globalAlpha = 1; ctx.lineWidth = 1;
+  }
+
+  /* ── Main wrapper ── */
   Canvas.drawCourtroom = function () {
-    _origDrawCourtroom(); // draws everything: judge, lawyers, witness, jurors, floor
+    var ctx = this.ctx;
+    var frame = this.frame || 0;
 
-    const ctx = this.ctx;
+    /* PHASE 1 — Background (drawn first, characters appear on top) */
+    drawCeilingAndRailing(ctx);
+    drawGalleryCrowd(ctx, frame);
+    drawColumns(ctx);
+    drawWallDetails(ctx);
+    drawCourtSeal(ctx, 395, 50);
 
-    /* Duel turn indicator — gold glow on the active player's podium */
+    /* PHASE 2 — Original scene (judge, lawyers, witness, jurors, floor, podiums) */
+    _origDrawCourtroom();
+
+    /* PHASE 3 — Foreground effects */
+    drawWindowLightShafts(ctx, frame);
+    drawPodiumPapers(ctx);
+    drawWitnessNameplate(ctx);
+    drawCourtReporter(ctx);
+    drawDustMotes(ctx, frame);
+    drawVignette(ctx);
+
+    /* Character mood effects */
+    var cs = S.court && S.court._characterState;
+    if (cs) drawCharMoodFx(ctx, cs, frame);
+
+    /* PHASE 4 — Game state overlays */
+
+    /* Duel turn indicator — gold glow on active podium */
     if (S.duel && S.duel.active) {
-      const p1Active = S.duel.turn === 1;
-      /* Podium positions from original: left=180,290 right=540,290 */
-      const gx = p1Active ? 178 : 538;
-      ctx.globalAlpha = 0.28 + 0.12 * Math.sin(this.frame * 0.12);
+      var p1Active = S.duel.turn === 1;
+      var gx = p1Active ? 178 : 538;
+      ctx.globalAlpha = 0.3 + 0.14 * Math.sin(frame * 0.12);
       ctx.strokeStyle = '#ffdc5c';
       ctx.lineWidth = 3;
       ctx.strokeRect(gx - 2, 287, 86, 36);
@@ -3504,34 +3834,53 @@
       ctx.font = 'bold 8px Courier New';
       ctx.fillStyle = '#ffdc5c';
       ctx.textAlign = 'center';
-      ctx.fillText('◄ TURN', p1Active ? 220 : 580, 346);
+      ctx.fillText('◄ YOUR TURN', p1Active ? 220 : 580, 346);
       ctx.textAlign = 'left';
     }
 
-    /* Excited jury highlight when jury strongly favours one side */
-    const juryVal = (S.court && S.court.jury) || (S.duel && S.duel.jury) || 0;
-    if (Math.abs(juryVal) > 25) {
-      ctx.globalAlpha = 0.12 + 0.06 * Math.sin(this.frame * 0.18);
+    /* Excited jury highlight */
+    var juryVal = (S.court && S.court.jury) || (S.duel && S.duel.jury) || 0;
+    if (Math.abs(juryVal) > 20) {
+      ctx.globalAlpha = 0.10 + 0.07 * Math.sin(frame * 0.18);
       ctx.fillStyle = juryVal > 0 ? '#4488ff' : '#ff4444';
       ctx.fillRect(45, 196, 130, 54);
       ctx.globalAlpha = 1;
+      // Jury reaction floater text
+      if (Math.abs(juryVal) > 45 && frame % 80 < 40) {
+        ctx.fillStyle = juryVal > 0 ? '#88aaff' : '#ff8888';
+        ctx.font = '6px Courier New';
+        ctx.textAlign = 'center';
+        ctx.globalAlpha = 0.6 + 0.3 * Math.sin(frame * 0.1);
+        ctx.fillText(juryVal > 0 ? 'JURY SWAYED' : 'JURY HOSTILE', 110, 192);
+        ctx.globalAlpha = 1;
+        ctx.textAlign = 'left';
+      }
     }
 
-    /* Speech bubble overlay */
+    /* Speech bubble with tail */
     if (this.bubble && this.bubble.timer > 0) {
-      const bx = this.bubble.side === 'player' ? 185 : 545;
-      const by = 232;
-      ctx.fillStyle = 'rgba(255,255,240,0.94)';
+      var side = this.bubble.side;
+      var bx = side === 'player' ? 182 : 540;
+      var by = 216;
+      var bw = 128, bh = 28;
+      ctx.fillStyle = 'rgba(255,255,242,0.96)';
       ctx.strokeStyle = '#1a0a2a';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(bx, by, 110, 22, 3);
-      else ctx.rect(bx, by, 110, 22);
+      if (ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 4);
+      else ctx.rect(bx, by, bw, bh);
       ctx.fill(); ctx.stroke();
+      // Bubble tail pointing down toward speaker
+      ctx.beginPath();
+      ctx.moveTo(bx + 16, by + bh);
+      ctx.lineTo(bx + 8, by + bh + 12);
+      ctx.lineTo(bx + 28, by + bh);
+      ctx.fillStyle = 'rgba(255,255,242,0.96)';
+      ctx.fill();
       ctx.fillStyle = '#1a0a2a';
       ctx.font = 'bold 9px Courier New';
       ctx.textAlign = 'left';
-      ctx.fillText(this.bubble.text.substring(0, 17), bx + 4, by + 14);
+      ctx.fillText(this.bubble.text.substring(0, 19), bx + 5, by + 17);
       this.bubble.timer--;
     }
   };
@@ -3541,23 +3890,25 @@
 
   /* Homepage shimmer particles */
   (function () {
-    const menu = document.getElementById('menu');
+    var menu = document.getElementById('menu');
     if (!menu) return;
-    const canvas = document.createElement('canvas');
+    var canvas = document.createElement('canvas');
     canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:0.35';
     menu.style.position = 'relative';
     menu.insertBefore(canvas, menu.firstChild);
-    const particles = Array.from({ length: 28 }, function () {
-      return { x: Math.random(), y: Math.random(), vy: 0.0003 + Math.random() * 0.0004, size: 1 + Math.random() * 2, alpha: Math.random() };
+    var particles = Array.from({ length: 36 }, function () {
+      return { x: Math.random(), y: Math.random(), vy: 0.0002 + Math.random() * 0.0005, vx: (Math.random() - 0.5) * 0.0002, size: 1 + Math.random() * 2.5, alpha: Math.random() };
     });
     function tick() {
       canvas.width = menu.offsetWidth; canvas.height = menu.offsetHeight;
-      const ctx2 = canvas.getContext('2d');
+      var ctx2 = canvas.getContext('2d');
       ctx2.clearRect(0, 0, canvas.width, canvas.height);
       particles.forEach(function (p) {
-        p.y -= p.vy; if (p.y < 0) p.y = 1;
-        ctx2.globalAlpha = 0.3 + 0.5 * Math.abs(Math.sin(p.alpha + Date.now() / 1800));
-        ctx2.fillStyle = '#d4a82c';
+        p.y -= p.vy; p.x += p.vx;
+        if (p.y < 0) { p.y = 1; p.x = Math.random(); }
+        if (p.x < 0 || p.x > 1) p.vx *= -1;
+        ctx2.globalAlpha = 0.25 + 0.6 * Math.abs(Math.sin(p.alpha + Date.now() / 1600));
+        ctx2.fillStyle = Math.random() > 0.85 ? '#fff' : '#d4a82c';
         ctx2.fillRect(Math.round(p.x * canvas.width), Math.round(p.y * canvas.height), p.size, p.size);
       });
       ctx2.globalAlpha = 1;
@@ -3566,7 +3917,7 @@
     tick();
   })();
 
-  console.log('[Visual Enhancements] canvas wrapper + homepage particles loaded.');
+  console.log('[Visual Enhancements v2] Rich courtroom: gallery crowd, columns, seal, ceiling lights, light shafts, dust motes, mood FX, vignette loaded.');
 })();
 
 
@@ -3683,26 +4034,48 @@
    * ---------------------------------------------------------- */
   var INVEST_ACTIONS = {
     office:  [
-      { id: 'interview',    label: '👥 Interview Client',      desc: 'Reveal a witness statement weakness' },
-      { id: 'review_docs',  label: '📄 Review Case Files',     desc: '+Confidence; chance to surface a lead' },
-      { id: 'prep_theory',  label: '🧠 Build Case Theory',     desc: '+Logic; sharpen your case narrative' },
+      { id: 'interview',    label: '👥 Interview Client',          desc: 'Sit with your client and dig for inconsistencies in their account — may surface a witness weakness.' },
+      { id: 'review_docs',  label: '📄 Review Case Files',         desc: 'Hours in the files. Good chance of a lead; always sharpens your legal argument.' },
+      { id: 'prep_theory',  label: '🧠 Build Case Theory',         desc: 'Map the narrative from scratch. Low lead chance but +Logic that pays off in cross-exam.' },
     ],
     corp: [
-      { id: 'pressure_asst', label: '🗣️ Pressure the Assistant', desc: 'High risk — weakness or opponent forewarned' },
-      { id: 'follow_money',  label: '💰 Follow the Money',        desc: 'Chase the financial trail for hard evidence' },
-      { id: 'read_opp',      label: '🔍 Study Opposing Counsel',  desc: '+Logic; learn their personality and tells' },
+      { id: 'pressure_asst', label: '🗣️ Pressure the Assistant',  desc: 'High risk, high reward. They may crack and reveal something — or warn opposing counsel you\'re coming.' },
+      { id: 'follow_money',  label: '💰 Follow the Money',         desc: 'Trace financial records for hard evidence. Best chance of a concrete weakness if the case has a money angle.' },
+      { id: 'read_opp',      label: '🔍 Study Opposing Counsel',   desc: 'Learn how they fight. +Logic; know if they\'re a charmer, a shark, or a methodical machine.' },
     ],
     records: [
-      { id: 'search_records',   label: '📜 Search Filed Records',    desc: 'Moderate chance — precedent or weakness' },
-      { id: 'analyze_docs',     label: '🔬 Analyze Documents',       desc: 'Reveal a contradiction in testimony' },
-      { id: 'recheck_timeline', label: '⏱️ Recheck Timeline',       desc: '+Legal Skill; find timeline inconsistencies' },
+      { id: 'search_records',   label: '📜 Search Filed Records',  desc: 'Dig through public filings and prior testimony. Moderate chance of surfacing a precedent or weakness.' },
+      { id: 'analyze_docs',     label: '🔬 Analyze Documents',     desc: 'Forensic document review. Good chance of finding a contradiction hidden in the paperwork.' },
+      { id: 'recheck_timeline', label: '⏱️ Recheck Timeline',     desc: 'Rebuild the sequence of events minute by minute. +Legal Skill; exposes alibi gaps.' },
+    ],
+    courthouse: [
+      { id: 'interview',    label: '👥 Speak to Court Staff',       desc: 'Clerks and bailiffs sometimes know more than the record shows.' },
+      { id: 'search_records',   label: '📜 Pull Case History',     desc: 'Prior rulings, filings, procedural notes — anything the prosecution may have buried.' },
+      { id: 'read_opp',      label: '🔍 Watch Opposing Counsel',   desc: 'See how they prepared. +Logic; gives you a read on their opening strategy.' },
+    ],
+    firm: [
+      { id: 'review_docs',  label: '📄 Review Internal Files',     desc: 'Your firm\'s own files on the client. High chance of a relevant lead.' },
+      { id: 'prep_theory',  label: '🧠 War-Room Session',          desc: 'Brief the whole team. Strong +Logic and a decent chance of a key insight.' },
+      { id: 'follow_money',  label: '💰 Check Client Financials',  desc: 'Run a background financial check on your own client — sometimes the lead is there.' },
+    ],
+    lab: [
+      { id: 'analyze_docs',     label: '🔬 Request Lab Analysis',  desc: 'Submit physical evidence for independent analysis. High chance of technical contradiction.' },
+      { id: 'recheck_timeline', label: '⏱️ Review Forensic Report',desc: 'Challenge the prosecution\'s forensic timeline. +Legal Skill; often surfaces a timing weakness.' },
+      { id: 'interview',    label: '👥 Interview the Technician',   desc: 'Question the analyst before trial — you may reveal a procedural gap.' },
     ],
   };
+
+  /* Default picker actions for any location not explicitly listed */
+  var DEFAULT_INVEST_ACTIONS = [
+    { id: 'interview',    label: '👥 Talk to Contacts',          desc: 'Ask around. Someone here may know something useful.' },
+    { id: 'search_records', label: '📜 Search for Records',      desc: 'Look for anything filed, written, or logged at this location.' },
+    { id: 'read_opp',     label: '🔍 Scout the Opposition',      desc: 'Understand what the prosecution already knows about this place.' },
+  ];
 
   function showInvestPicker(loc) {
     var existing = document.getElementById('investActionPicker');
     if (existing) existing.remove();
-    var actions = INVEST_ACTIONS[loc.id] || [{ id: 'search', label: '🔍 Investigate', desc: 'Standard investigation approach' }];
+    var actions = INVEST_ACTIONS[loc.id] || DEFAULT_INVEST_ACTIONS || [{ id: 'search', label: '🔍 Investigate', desc: 'Standard investigation approach' }];
     var picker = document.createElement('div');
     picker.id = 'investActionPicker';
     picker.className = 'invest-picker';
@@ -3740,29 +4113,128 @@
       return c.statements[idx].hint;
     }
 
-    if (actionId === 'interview' || actionId === 'search_records') {
+    var oppName = c.opponent ? c.opponent.name : 'opposing counsel';
+    var witName = c.witness  ? c.witness.name  : 'the witness';
+    var caseTitle = c.title || 'this case';
+
+    /* Flavour intros vary per action for less repetition */
+    var interviewIntros = [
+      'After an hour with your client, a critical detail surfaces:',
+      'Your client is reluctant at first — but eventually confirms:',
+      'Pressing for specifics, you uncover a statement weakness:',
+      'Buried in the back-and-forth, your client lets slip:',
+    ];
+    var docIntros = [
+      'Deep in the filing stack, a document contradicts the prosecution\'s narrative:',
+      'Cross-referencing dates and signatures, you find a discrepancy:',
+      'A buried exhibit reveals what the prosecution hoped to hide:',
+      'The paper trail doesn\'t lie — an overlooked record shows:',
+    ];
+    var theoryIntros = [
+      'Mapping the full timeline reveals a logical impossibility:',
+      'Your case theory, tested against the known facts, exposes:',
+      'Whiteboard session — the narrative breaks down at one critical point:',
+      'The more you examine the theory, the clearer the weakness becomes:',
+    ];
+    var pressIntros = [
+      'Under sustained pressure, they finally give something up:',
+      'You push hard and they fold — a single sentence that changes everything:',
+      'It takes longer than expected, but they crack:',
+    ];
+    var moneyIntros = [
+      'Following the transfers three levels deep, you find the anomaly:',
+      'The accounts tell a story the prosecution hasn\'t read yet:',
+      'One transaction, buried between legitimate entries, stands out:',
+    ];
+
+    function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+    if (actionId === 'interview') {
       var h = revealWeak();
-      clue = h ? '📁 ' + loc.name + ': Critical lead — "' + h + '"' : '📁 ' + loc.name + ': Thorough prep. +1 Confidence.';
-      if (!h) S.player.stats.confidence = Math.min(10, S.player.stats.confidence + 1);
+      if (h) {
+        clue = '👥 ' + loc.name + ' — ' + pick(interviewIntros) + '\n"' + h + '"\nFile this. It\'s your opening gambit against ' + witName + '.';
+      } else {
+        S.player.stats.confidence = Math.min(10, (S.player.stats.confidence || 5) + 1);
+        var noLeadLines = [
+          'No new angles surfaced — but the session sharpened your delivery. Your client trusts you more. +1 Confidence.',
+          'Nothing concrete yet. But you know your client better now. That matters in the room. +1 Confidence.',
+          'The session was dry, but you caught how your client holds under pressure. Useful. +1 Confidence.',
+        ];
+        clue = '👥 ' + loc.name + ' — ' + pick(noLeadLines);
+      }
+    } else if (actionId === 'search_records') {
+      var h1 = revealWeak();
+      if (h1) {
+        clue = '📜 ' + loc.name + ' — ' + pick(docIntros) + '\n"' + h1 + '"\nThis is on record. The prosecution can\'t walk it back.';
+      } else {
+        S.player.stats.legalSkill = Math.min(10, (S.player.stats.legalSkill || 5) + 1);
+        clue = '📜 ' + loc.name + ' — The filings are clean on the surface. No smoking gun — but the procedural map you built will sharpen your cross. +1 Legal Skill.';
+      }
     } else if (actionId === 'review_docs' || actionId === 'analyze_docs') {
-      if (r < 0.55) { var h2 = revealWeak(); clue = h2 ? '📄 ' + loc.name + ': Documents show — "' + h2 + '"' : '📄 ' + loc.name + ': Careful analysis. +1 Legal Skill.'; if (!h2) S.player.stats.legalSkill = Math.min(10, S.player.stats.legalSkill + 1); }
-      else { S.player.stats.legalSkill = Math.min(10, S.player.stats.legalSkill + 1); clue = '📄 ' + loc.name + ': Hours of careful work. +1 Legal Skill.'; }
+      if (r < 0.58) {
+        var h2 = revealWeak();
+        if (h2) {
+          clue = '📄 ' + loc.name + ' — ' + pick(docIntros) + '\n"' + h2 + '"\nMark this page. You\'ll need it in cross-examination.';
+        } else {
+          S.player.stats.legalSkill = Math.min(10, (S.player.stats.legalSkill || 5) + 1);
+          clue = '📄 ' + loc.name + ' — Thorough document review. No single breakthrough, but your legal argument is now watertight. +1 Legal Skill.';
+        }
+      } else {
+        S.player.stats.legalSkill = Math.min(10, (S.player.stats.legalSkill || 5) + 1);
+        clue = '📄 ' + loc.name + ' — Three hours in the files. Nothing jumps out — but you understand the documentary foundation better than anyone in that courtroom will. +1 Legal Skill.';
+      }
     } else if (actionId === 'prep_theory' || actionId === 'recheck_timeline') {
-      S.player.stats.logic = Math.min(10, S.player.stats.logic + 1);
-      var h3 = r < 0.45 ? revealWeak() : null;
-      clue = h3 ? '🧠 ' + loc.name + ': Theory spots a gap — "' + h3 + '"' : '🧠 ' + loc.name + ': Theory sharpened. +1 Logic.';
+      S.player.stats.logic = Math.min(10, (S.player.stats.logic || 5) + 1);
+      var h3 = r < 0.48 ? revealWeak() : null;
+      if (h3) {
+        clue = '🧠 ' + loc.name + ' — ' + pick(theoryIntros) + '\n"' + h3 + '"\nThis is the seam in their narrative. Pull it in court.';
+      } else {
+        clue = '🧠 ' + loc.name + ' — The theory holds. The timeline is mapped, the logic is airtight, and your argument has a clean through-line from opening to closing. +1 Logic.';
+      }
     } else if (actionId === 'pressure_asst') {
-      if (r < 0.52) { var h4 = revealWeak(); clue = h4 ? '🗣️ ' + loc.name + ': They crack — "' + h4 + '"' : '🗣️ ' + loc.name + ': +1 Intimidation.'; if (!h4) S.player.stats.intimidation = Math.min(10, S.player.stats.intimidation + 1); }
-      else { S.invest.coldOpp = true; clue = '🗣️ ' + loc.name + ': They tipped off opposing counsel. ⚠️ Opponent forewarned.'; }
+      if (r < 0.52) {
+        var h4 = revealWeak();
+        if (h4) {
+          clue = '🗣️ ' + loc.name + ' — ' + pick(pressIntros) + '\n"' + h4 + '"\nThis never makes it into any official record. Use it carefully.';
+        } else {
+          S.player.stats.intimidation = Math.min(10, (S.player.stats.intimidation || 5) + 1);
+          clue = '🗣️ ' + loc.name + ' — They held their ground, but you rattled them. They\'ll think twice before volunteering anything for the prosecution now. +1 Intimidation.';
+        }
+      } else {
+        S.invest.coldOpp = true;
+        clue = '🗣️ ' + loc.name + ' — ⚠️ They didn\'t crack — they made a call. ' + oppName + ' now knows you were fishing here. Expect a prepared counter. Opponent forewarned.';
+      }
     } else if (actionId === 'follow_money') {
-      if (r < 0.65) { var h5 = revealWeak(); clue = h5 ? '💰 ' + loc.name + ': Financial trail — "' + h5 + '"' : '💰 ' + loc.name + ': +1 Legal Skill.'; if (!h5) S.player.stats.legalSkill = Math.min(10, S.player.stats.legalSkill + 1); }
-      else { clue = '💰 ' + loc.name + ': Accounts obscured. Trail runs cold.'; }
+      if (r < 0.65) {
+        var h5 = revealWeak();
+        if (h5) {
+          clue = '💰 ' + loc.name + ' — ' + pick(moneyIntros) + '\n"' + h5 + '"\nThis isn\'t in the prosecution\'s exhibit list. Yet.';
+        } else {
+          S.player.stats.legalSkill = Math.min(10, (S.player.stats.legalSkill || 5) + 1);
+          clue = '💰 ' + loc.name + ' — The trail goes three levels deep before it goes cold. Nothing definitive — but you understand the financial architecture now. +1 Legal Skill.';
+        }
+      } else {
+        clue = '💰 ' + loc.name + ' — The accounts are clean. Either they\'re genuinely clean, or someone scrubbed them very recently. Either way, the money trail ends here.';
+      }
     } else if (actionId === 'read_opp') {
-      S.player.stats.logic = Math.min(10, S.player.stats.logic + 1);
-      clue = '🔍 ' + loc.name + ': Opposing counsel is "' + c.opponent.personality + '". Adapt your approach. +1 Logic.';
+      S.player.stats.logic = Math.min(10, (S.player.stats.logic || 5) + 1);
+      var oppStyle = c.opponent ? c.opponent.personality : 'methodical';
+      var oppReads = {
+        relentless:  'They don\'t negotiate. They build a wall of evidence and walk toward you. Don\'t flinch — make them overcommit.',
+        charming:    'They\'ll try to make the jury like them more than they trust you. Counter with precision. Facts beat warmth.',
+        aggressive:  'They lead with pressure, hoping you fold early. Stand firm. Their aggression is a tell — they\'re not confident in their evidence.',
+        methodical:  'Slow, deliberate, surgical. They\'ll dismantle your case piece by piece unless you find the thread that unravels theirs first.',
+        smooth:      'Dangerous. They make everything sound reasonable. Your job is to make the unreasonable visible.',
+      };
+      clue = '🔍 ' + loc.name + ' — Profiling ' + oppName + ' (style: ' + oppStyle + '):\n' +
+             (oppReads[oppStyle] || 'Experienced and well-prepared. Expect no obvious openings — you\'ll need to create your own.') + '\n+1 Logic.';
     } else {
       var h6 = revealWeak();
-      clue = h6 ? '🔍 ' + loc.name + ': — "' + h6 + '"' : '🔍 ' + loc.name + ': Investigation complete.';
+      if (h6) {
+        clue = '🔍 ' + loc.name + ' — A contact points you toward something you hadn\'t considered:\n"' + h6 + '"\nCould be the angle you\'ve been looking for.';
+      } else {
+        clue = '🔍 ' + loc.name + ' — You came, you looked, you listened. Nothing concrete — but the time wasn\'t wasted. You understand the terrain better.';
+      }
     }
 
     S.invest.clues.push(clue);
@@ -4728,4 +5200,208 @@
   }
 
   console.log('[trialVariety_v1] Patterns, events, dialogue, character states, stamps, spotlights, verdict fanfare loaded.');
+})();
+
+/* ============================================================
+   COURT VARIETY v2
+   — Richer, non-repetitive court log messages
+   — Varied witness reactions per testimony type
+   — Judge interjections and crowd murmurs
+   — Better wrong-answer consequences with context
+   ============================================================ */
+(function courtVariety_v2() {
+  if (typeof Game === 'undefined' || typeof S === 'undefined') return;
+
+  /* Pools of varied log lines keyed by context */
+  var LOG_POOLS = {
+    objectionCorrect: [
+      'The judge nods sharply. "Sustained. Counsel, that objection is well-placed."',
+      'The prosecution flinches. Your timing was perfect.',
+      '"Sustained." The word lands like a gavel strike.',
+      'The witness pauses, recalibrating. The momentum just shifted.',
+      'Murmurs from the gallery. You\'ve exposed a crack in their case.',
+    ],
+    objectionWrong: [
+      '"Overruled." The judge doesn\'t even look up.',
+      'The prosecution suppresses a smile. You\'ll feel that later.',
+      '"Counsel — that objection has no basis here. Overruled."',
+      'The jury foreman frowns at their notepad. That one cost you.',
+      'Wrong call. The judge\'s patience ticks down another notch.',
+    ],
+    evidenceHit: [
+      'The gallery stirs. The prosecution\'s narrative just fractured.',
+      'The witness stares at the exhibit. There is no good answer.',
+      'Perfect match. The evidence does the talking — and it\'s devastating.',
+      '"I... that's..." The witness trails off. Exactly where you want them.',
+      'That piece of evidence just closed a door the prosecution needed open.',
+    ],
+    evidenceMiss: [
+      'The witness recovers quickly. Wrong angle.',
+      'The prosecution objects — and for once, they\'re right.',
+      '"Objection — relevance." The judge agrees. Refocus.',
+      'The jury\'s attention drifts. That one didn\'t land.',
+      'Not the right evidence for this moment. The witness is unfazed.',
+    ],
+    crossExamine: [
+      'The witness shifts in their seat. You can see them choosing words more carefully now.',
+      'Every question tightens the net around their story.',
+      '"Could you repeat your earlier statement about..." — the witness hesitates.',
+      'Confidence draining. The witness is on the back foot.',
+      'Each answer opens another question. You\'re building toward the break.',
+    ],
+    pressWitness: [
+      'Tension spikes in the room. The witness grips the stand.',
+      'The judge watches. The jury watches harder.',
+      '"Answer the question." Your voice leaves no room.',
+      'The prosecution is on their feet — but you got the reaction you needed.',
+      'Sweat. Pause. A glance at opposing counsel. The pressure is working.',
+    ],
+    judgeAngry: [
+      '"Counsel. I will not warn you again. Proceed — carefully."',
+      'The gavel comes down hard. The room goes still.',
+      '"One more outburst and I will hold you in contempt."',
+      'The judge leans forward. That expression does not bode well.',
+      'Dead silence. The judge is staring directly at you.',
+    ],
+    jurySwayed: [
+      'The foreman shifts. The jury has heard something they can\'t unhear.',
+      'A juror in the back row makes a note. That note matters.',
+      'Sympathy is moving — you can feel it.',
+      'The jury\'s body language has changed. They\'re leaning toward you now.',
+      'The foreman\'s expression tells you everything. This testimony is working.',
+    ],
+    strongMove: [
+      'The courtroom holds its breath.',
+      'Opposing counsel\'s pen stops moving.',
+      'This is what the whole case has been building to.',
+      'You can hear the jury processing what just happened.',
+      'The judge sets down their pen. Even they\'re paying attention now.',
+    ],
+    stmtTypeEmotional: [
+      'The witness is playing to the gallery. Don\'t let sentiment override the facts.',
+      'Emotional testimony. Powerful — but check if it aligns with the documented record.',
+      'The jury is moved. Your job is to ground them in evidence, not feeling.',
+    ],
+    stmtTypeTrap: [
+      'Something about this statement feels engineered. Read it carefully before responding.',
+      'The prosecution wants you to bite on this one. Don\'t.',
+      'Trap testimony. The obvious response is wrong. Think.',
+    ],
+    stmtTypeTechnical: [
+      'Technical testimony. Precision matters here — match evidence that directly contradicts the specific claim.',
+      'This is where preparation pays off. The weakness is in the data, not the narrative.',
+      'Numbers and procedures. Challenge the methodology, not the conclusion.',
+    ],
+    stmtTypeAlibi: [
+      'An alibi claim. The contradiction is in the timeline — find the gap.',
+      'They\'re building a location defence. Documentation beats assertion here.',
+      'Alibi testimony. It holds or it doesn\'t — find the evidence that proves which.',
+    ],
+  };
+
+  var _usedLines = {};
+  function pickLine(key) {
+    var pool = LOG_POOLS[key];
+    if (!pool) return null;
+    if (!_usedLines[key]) _usedLines[key] = [];
+    var used = _usedLines[key];
+    var avail = pool.filter(function(_, i) { return !used.includes(i); });
+    if (!avail.length) { _usedLines[key] = []; avail = pool.slice(); }
+    var idx = pool.indexOf(avail[Math.floor(Math.random() * avail.length)]);
+    used.push(idx);
+    return pool[idx];
+  }
+
+  /* Statement-type tip shown at start of each new statement */
+  var _lastStmtIdx = -1;
+  function _injectStmtTip() {
+    var sc = S.court;
+    if (!sc || !sc.statements || !S.caseData) return;
+    var idx = sc.stmtIndex || sc.statementIdx || 0;
+    if (idx === _lastStmtIdx) return;
+    _lastStmtIdx = idx;
+    var stmt = sc.statements[idx];
+    if (!stmt) return;
+    var typeKey = 'stmtType' + (stmt.type || 'fact').replace(/_./g, function(m) { return m[1].toUpperCase(); });
+    typeKey = typeKey.charAt(0).toUpperCase() + typeKey.slice(1);
+    typeKey = 'stmtType' + (stmt.type || 'fact').split('_').map(function(w, i) { return i ? w[0].toUpperCase() + w.slice(1) : w; }).join('');
+    var line = pickLine(typeKey);
+    if (line && Game.courtLog) {
+      setTimeout(function() {
+        try { Game.courtLog('💡 ' + line, 'hint'); } catch(e) {}
+      }, 180);
+    }
+  }
+
+  /* Hook renderCourt to inject statement tips */
+  var _origRC2 = Game.renderCourt && Game.renderCourt.bind(Game);
+  if (_origRC2) {
+    Game.renderCourt = function() {
+      _origRC2.apply(this, arguments);
+      _injectStmtTip();
+    };
+  }
+
+  /* Richer wrong-answer log (hook afterPlayerTurn for bad results) */
+  var _origAPT2 = Game.afterPlayerTurn && Game.afterPlayerTurn.bind(Game);
+  if (_origAPT2) {
+    Game.afterPlayerTurn = function(result) {
+      _origAPT2.apply(this, arguments);
+      if (!result) return;
+      var sc = S.court;
+      if (!sc) return;
+
+      /* Correct evidence hit */
+      if (result.evidenceHit) {
+        var line = pickLine('evidenceHit');
+        if (line) setTimeout(function() { try { Game.courtLog('⚡ ' + line, 'drama'); } catch(e) {} }, 250);
+        /* Judge approval on a clean hit */
+        if (sc.judgePatience > 70 && Math.random() < 0.4) {
+          var jline = pickLine('jurySwayed');
+          if (jline) setTimeout(function() { try { Game.courtLog(jline, 'judge'); } catch(e) {} }, 650);
+        }
+      }
+      /* Wrong evidence */
+      else if (result.evidenceMiss) {
+        var mline = pickLine('evidenceMiss');
+        if (mline) setTimeout(function() { try { Game.courtLog(mline, 'bad'); } catch(e) {} }, 250);
+      }
+      /* Correct objection */
+      if (result.objectionCorrect) {
+        var ocline = pickLine('objectionCorrect');
+        if (ocline) setTimeout(function() { try { Game.courtLog('✅ ' + ocline, 'good'); } catch(e) {} }, 300);
+      }
+      /* Wrong objection */
+      else if (result.objectionWrong) {
+        var owline = pickLine('objectionWrong');
+        if (owline) setTimeout(function() { try { Game.courtLog('❌ ' + owline, 'bad'); } catch(e) {} }, 300);
+        /* Bigger patience penalty in procedural battle pattern */
+        if (sc._pattern && sc._pattern.name === 'Procedural Battle') {
+          sc.judgePatience = Math.max(0, (sc.judgePatience || 100) - 8);
+        }
+      }
+      /* Cross-examine action */
+      if (result.action === 'cross') {
+        var cline = pickLine('crossExamine');
+        if (cline) setTimeout(function() { try { Game.courtLog(cline, 'info'); } catch(e) {} }, 400);
+      }
+      /* Pressure action */
+      if (result.action === 'pressure') {
+        var pline = pickLine('pressWitness');
+        if (pline) setTimeout(function() { try { Game.courtLog(pline, 'drama'); } catch(e) {} }, 350);
+      }
+      /* Judge anger when patience drops low */
+      if ((sc.judgePatience || 100) < 30 && Math.random() < 0.45) {
+        var jangry = pickLine('judgeAngry');
+        if (jangry) setTimeout(function() { try { Game.courtLog('⚖ ' + jangry, 'judge'); } catch(e) {} }, 700);
+      }
+      /* Strong move indicator (focus spend, dramatic reveal, etc.) */
+      if (['reveal', 'expose', 'secondchair'].includes(result.action)) {
+        var sline = pickLine('strongMove');
+        if (sline) setTimeout(function() { try { Game.courtLog('🎯 ' + sline, 'drama'); } catch(e) {} }, 500);
+      }
+    };
+  }
+
+  console.log('[courtVariety_v2] Richer log messages, statement tips, and judge reactions loaded.');
 })();
