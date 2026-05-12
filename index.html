@@ -169,73 +169,81 @@
   </section>
 
   <section id="court" class="screen hidden">
-    <div id="courtCanvasWrap">
-      <canvas id="courtCanvas" width="800" height="360"></canvas>
-      <div id="bigCue" class="big-cue hidden"></div>
-    </div>
+    <div class="court-layout">
 
-    <div class="bars">
-      <div class="bar-row">
-        <span class="bar-label" id="pName">You</span>
-        <div class="bar"><div id="barPlayer" class="fill blue"></div></div>
-        <span id="numPlayer" class="num">100</span>
-      </div>
-      <div class="bar-row">
-        <span class="bar-label" id="oppName">Opp.</span>
-        <div class="bar"><div id="barOpp" class="fill red"></div></div>
-        <span id="numOpp" class="num">100</span>
-      </div>
-      <div class="bar-row mini">
-        <span class="bar-label">Jury</span>
-        <div class="bar centered"><div id="barJury" class="fill gold"></div></div>
-        <span id="numJury" class="num">0</span>
-      </div>
-      <div class="bar-row mini">
-        <span class="bar-label">Judge</span>
-        <div class="bar"><div id="barJudge" class="fill purple"></div></div>
-        <span id="numJudge" class="num">100</span>
-      </div>
-      <div class="bar-row mini">
-        <span class="bar-label">Witness</span>
-        <div class="bar"><div id="barWit" class="fill green"></div></div>
-        <span id="numWit" class="num">100</span>
-      </div>
-      <div class="bar-row mini trial-clock-row">
-        <span class="bar-label">Trial Clock</span>
-        <div class="bar"><div id="barClock" class="fill clock"></div></div>
-        <span id="trialClock" class="num">1/18</span>
-      </div>
-      <div class="bar-row mini focus-row">
-        <span class="bar-label">Focus</span>
-        <div class="bar"><div id="barFocus" class="fill focus"></div></div>
-        <span id="numFocus" class="num">0</span>
-      </div>
-    </div>
+      <div class="court-left-col">
+        <div id="courtCanvasWrap">
+          <canvas id="courtCanvas" width="800" height="360"></canvas>
+          <div id="bigCue" class="big-cue hidden"></div>
+        </div>
 
-    <div class="court-tactics">
-      <span id="comboBadge" class="badge">Combo x0</span>
-      <span id="trapBadge" class="badge">No Trap</span>
-      <span id="tacticTip" class="tactic-tip">Read the testimony and choose your angle.</span>
-    </div>
+        <div class="bars">
+          <div class="bar-row">
+            <span class="bar-label" id="pName">You</span>
+            <div class="bar"><div id="barPlayer" class="fill blue"></div></div>
+            <span id="numPlayer" class="num">100</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label" id="oppName">Opp.</span>
+            <div class="bar"><div id="barOpp" class="fill red"></div></div>
+            <span id="numOpp" class="num">100</span>
+          </div>
+          <div class="bar-row mini">
+            <span class="bar-label">Jury</span>
+            <div class="bar centered"><div id="barJury" class="fill gold"></div></div>
+            <span id="numJury" class="num">0</span>
+          </div>
+          <div class="bar-row mini">
+            <span class="bar-label">Judge</span>
+            <div class="bar"><div id="barJudge" class="fill purple"></div></div>
+            <span id="numJudge" class="num">100</span>
+          </div>
+          <div class="bar-row mini">
+            <span class="bar-label">Witness</span>
+            <div class="bar"><div id="barWit" class="fill green"></div></div>
+            <span id="numWit" class="num">100</span>
+          </div>
+          <div class="bar-row mini trial-clock-row">
+            <span class="bar-label">Trial Clock</span>
+            <div class="bar"><div id="barClock" class="fill clock"></div></div>
+            <span id="trialClock" class="num">1/18</span>
+          </div>
+          <div class="bar-row mini focus-row">
+            <span class="bar-label">Focus</span>
+            <div class="bar"><div id="barFocus" class="fill focus"></div></div>
+            <span id="numFocus" class="num">0</span>
+          </div>
+        </div>
 
-    <div id="statementBox" class="statement">
-      <div id="whoTalking" class="who">Witness:</div>
-      <div id="statementText" class="quote">…</div>
-      <div id="hintLine" class="hint hidden"></div>
-    </div>
+        <div class="court-tactics">
+          <span id="comboBadge" class="badge">Combo x0</span>
+          <span id="trapBadge" class="badge">No Trap</span>
+          <span id="tacticTip" class="tactic-tip">Read the testimony and choose your angle.</span>
+        </div>
+      </div><!-- end court-left-col -->
 
-    <div id="courtActions" class="row wrap gap actions-row"></div>
+      <div class="court-right-col" id="courtRightPanel">
+        <div id="statementBox" class="statement">
+          <div id="whoTalking" class="who">Witness:</div>
+          <div id="statementText" class="quote">…</div>
+          <div id="hintLine" class="hint hidden"></div>
+        </div>
 
-    <div id="evidenceRow" class="card-row"></div>
+        <div id="courtActions" class="row wrap gap actions-row"></div>
 
-    <div id="objectionRow" class="row gap hidden">
-      <button class="big" data-obj="relevance">Relevance</button>
-      <button class="big" data-obj="hearsay">Hearsay</button>
-      <button class="big" data-obj="speculation">Speculation</button>
-      <button class="big" data-act="cancel-obj">Cancel</button>
-    </div>
+        <div id="evidenceRow" class="card-row"></div>
 
-    <div id="courtLog" class="log"></div>
+        <div id="objectionRow" class="row gap hidden">
+          <button class="big" data-obj="relevance">Relevance</button>
+          <button class="big" data-obj="hearsay">Hearsay</button>
+          <button class="big" data-obj="speculation">Speculation</button>
+          <button class="big" data-act="cancel-obj">Cancel</button>
+        </div>
+
+        <div id="courtLog" class="log"></div>
+      </div><!-- end court-right-col -->
+
+    </div><!-- end court-layout -->
   </section>
 
   <section id="verdict" class="screen hidden">

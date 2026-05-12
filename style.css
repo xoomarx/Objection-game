@@ -2617,6 +2617,265 @@ body.lang-ar .case-stamp { transform: rotate(2deg); }
   text-align: center;
   margin-bottom: 6px;
 }
+
+/* ============================================================
+   COURT SIDE-PANEL LAYOUT
+   ============================================================ */
+#court.screen {
+  padding: 6px 8px;
+}
+
+.court-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (min-width: 900px) {
+  .court-layout {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .court-left-col {
+    flex: 0 0 460px;
+    position: sticky;
+    top: 4px;
+    max-height: calc(100vh - 54px);
+    overflow-y: auto;
+  }
+
+  .court-left-col #courtCanvasWrap canvas {
+    width: 460px;
+    height: auto;
+    display: block;
+  }
+
+  .court-right-col {
+    flex: 1 1 0;
+    min-width: 0;
+    max-height: calc(100vh - 54px);
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  /* Slim scrollbar for right panel */
+  .court-right-col::-webkit-scrollbar { width: 4px; }
+  .court-right-col::-webkit-scrollbar-track { background: var(--bg-1); }
+  .court-right-col::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 2px; }
+}
+
+/* ============================================================
+   CHARACTER STATE VISUAL FX  (driven by data-state on canvas wrap)
+   ============================================================ */
+/* Triumphant — gold sparkle border pulse */
+#courtCanvasWrap[data-pstate="triumphant"] canvas {
+  box-shadow: 0 0 0 3px var(--gold), 0 0 18px 4px rgba(212,168,44,0.55);
+  animation: stateTriumphant 0.7s ease-in-out infinite alternate;
+}
+@keyframes stateTriumphant {
+  from { box-shadow: 0 0 0 3px var(--gold), 0 0 18px 4px rgba(212,168,44,0.55); }
+  to   { box-shadow: 0 0 0 3px var(--gold-bright), 0 0 30px 8px rgba(244,208,88,0.7); }
+}
+
+/* Rattled — orange flicker */
+#courtCanvasWrap[data-pstate="rattled"] canvas {
+  animation: stateRattled 0.18s linear infinite;
+}
+@keyframes stateRattled {
+  0%   { filter: brightness(1); }
+  25%  { filter: brightness(1.15) sepia(0.3); }
+  50%  { filter: brightness(0.9); }
+  75%  { filter: brightness(1.1) sepia(0.2); }
+  100% { filter: brightness(1); }
+}
+
+/* Panicking — red shake */
+#courtCanvasWrap[data-pstate="panicking"] canvas {
+  animation: statePanicking 0.12s linear infinite;
+}
+@keyframes statePanicking {
+  0%  { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+  100%{ transform: translateX(0); }
+}
+
+/* Broken witness — desaturate + dim */
+#courtCanvasWrap[data-wstate="broken"] canvas {
+  filter: grayscale(0.6) brightness(0.75);
+  transition: filter 0.4s ease;
+}
+
+/* Smug opponent — blue-green tint pulse */
+#courtCanvasWrap[data-ostate="smug"] canvas {
+  box-shadow: 0 0 0 2px #3af4c0, 0 0 14px 3px rgba(58,244,192,0.35);
+  animation: stateSmug 1.1s ease-in-out infinite alternate;
+}
+@keyframes stateSmug {
+  from { box-shadow: 0 0 0 2px #3af4c0, 0 0 14px 3px rgba(58,244,192,0.35); }
+  to   { box-shadow: 0 0 0 2px #3af4c0, 0 0 22px 6px rgba(58,244,192,0.55); }
+}
+
+/* ============================================================
+   CUTSCENE / KEY MOMENT OVERLAYS
+   ============================================================ */
+.court-cutscene-flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 900;
+  opacity: 0;
+  animation: cutsceneFlash 0.55s ease-out forwards;
+}
+.court-cutscene-flash.white { background: #fff; }
+.court-cutscene-flash.red   { background: #c0281a; }
+.court-cutscene-flash.gold  { background: var(--gold); }
+@keyframes cutsceneFlash {
+  0%   { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+
+/* Big dramatic text stamp (OBJECTION!, CONTRADICTION!, etc.) */
+.court-stamp-text {
+  position: fixed;
+  left: 50%;
+  top: 38%;
+  transform: translateX(-50%) scale(0.4) rotate(-6deg);
+  font-family: var(--font-pixel, monospace);
+  font-size: clamp(36px, 7vw, 72px);
+  font-weight: 900;
+  letter-spacing: 6px;
+  color: #fff;
+  text-shadow: 4px 4px 0 #000, -2px -2px 0 #000;
+  pointer-events: none;
+  z-index: 901;
+  white-space: nowrap;
+  animation: stampIn 0.7s cubic-bezier(0.22,1.4,0.36,1) forwards, stampOut 0.35s ease-in 1.4s forwards;
+}
+.court-stamp-text.objection { color: #f84040; }
+.court-stamp-text.contradiction { color: #f4d058; }
+.court-stamp-text.hold-it { color: #48c8f8; }
+@keyframes stampIn {
+  0%   { transform: translateX(-50%) scale(0.4) rotate(-8deg); opacity: 0; }
+  100% { transform: translateX(-50%) scale(1) rotate(-4deg); opacity: 1; }
+}
+@keyframes stampOut {
+  0%   { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) scale(1.15) rotate(-2deg); }
+}
+
+/* Spotlight beam for Dramatic Reveal */
+.court-spotlight {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse 220px 320px at var(--sx,50%) var(--sy,50%), rgba(255,240,140,0.22) 0%, transparent 72%);
+  pointer-events: none;
+  z-index: 800;
+  animation: spotlightFade 2.5s ease-out forwards;
+}
+@keyframes spotlightFade {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Witness breakdown shake */
+.court-witness-breakdown {
+  animation: witnessBreakdown 0.9s ease-in-out;
+}
+@keyframes witnessBreakdown {
+  0%  { filter: brightness(1); }
+  15% { filter: brightness(1.6) saturate(0.2); transform: translateY(-4px); }
+  30% { filter: brightness(0.7) saturate(0); transform: translateY(4px); }
+  50% { filter: brightness(1.4) saturate(0.1); transform: translateX(-6px); }
+  65% { filter: brightness(0.6); transform: translateX(6px); }
+  80% { filter: grayscale(0.5) brightness(0.8); transform: translate(0); }
+  100%{ filter: grayscale(0.6) brightness(0.75); }
+}
+
+/* Verdict fanfare overlay */
+.verdict-fanfare {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 850;
+  overflow: hidden;
+}
+.verdict-fanfare-particle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  animation: confettiFall var(--dur, 1.2s) linear var(--delay, 0s) forwards;
+}
+@keyframes confettiFall {
+  0%   { transform: translateY(-40px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0.3; }
+}
+
+/* Pattern indicator badge */
+.pattern-badge {
+  display: inline-block;
+  background: var(--bg-2);
+  border: 1px solid var(--purple);
+  color: var(--purple);
+  font-size: 10px;
+  letter-spacing: 2px;
+  padding: 2px 8px;
+  border-radius: 2px;
+  margin-left: 8px;
+  vertical-align: middle;
+  text-transform: uppercase;
+}
+
+/* Random court event notification */
+.court-event-toast {
+  position: fixed;
+  top: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-2);
+  border: 2px solid var(--gold);
+  color: var(--gold);
+  font-size: 12px;
+  letter-spacing: 2px;
+  padding: 8px 20px;
+  z-index: 950;
+  white-space: nowrap;
+  animation: toastSlide 3.2s ease forwards;
+  pointer-events: none;
+}
+@keyframes toastSlide {
+  0%   { opacity: 0; top: 48px; }
+  12%  { opacity: 1; top: 58px; }
+  75%  { opacity: 1; top: 58px; }
+  100% { opacity: 0; top: 48px; }
+}
+
+/* Statement type badge inside statementBox */
+.stmt-type-badge {
+  display: inline-block;
+  font-size: 9px;
+  letter-spacing: 2px;
+  padding: 1px 6px;
+  border-radius: 2px;
+  margin-left: 6px;
+  vertical-align: middle;
+  text-transform: uppercase;
+  border: 1px solid currentColor;
+  opacity: 0.8;
+}
+.stmt-type-fact         { color: var(--blue); }
+.stmt-type-alibi        { color: #a0d8ef; }
+.stmt-type-emotional    { color: #f48080; }
+.stmt-type-technical    { color: #80d4a0; }
+.stmt-type-misleading   { color: #f4a840; }
+.stmt-type-partial_lie  { color: #d480d4; }
+.stmt-type-trap         { color: var(--red); }
+.stmt-type-final_contradiction { color: var(--gold); }
 .closing-mg-intro {
   font-size: 12px;
   color: var(--ink-dim, #a090b0);

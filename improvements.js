@@ -4037,3 +4037,695 @@
 
   console.log('[Game Improvements v4] Dossier, investigation choices, closing minigame, witness intel, style bonuses, action grouping loaded.');
 })();
+
+/* ============================================================
+   NEW CASE PACK v2  — 12 additional cases
+   ============================================================ */
+(function newCasePack_v2() {
+  if (typeof CASES === 'undefined') { console.warn('[newCasePack_v2] CASES not found'); return; }
+
+  var newCases = [
+
+    /* 1 — THE MISSING LEDGER */
+    {
+      title: 'The Missing Ledger',
+      intro: 'Your client, CFO Dana Reeves, is accused of destroying the company's financial records to conceal a $4M embezzlement. The prosecution's star witness: her own assistant.',
+      category: 'financial',
+      pattern: 'evidenceSuppression',
+      diff: 2,
+      reward: 1800,
+      opponent: { name: 'Prosecutor Holt', personality: 'relentless', tieColor: '#555', hairColor: '#222' },
+      witness: { name: 'Marcus Laine', role: 'Executive Assistant' },
+      evidencePool: ['financial_ledger','internal_memo','email_thread','phone_record','access_badge_log','calendar_invite'],
+      statements: [
+        { text: 'I personally watched Ms. Reeves shred documents on the night of the audit.', weakness: 'access_badge_log', obj: 'speculation', hint: 'The badge log shows she was off-site that evening.', type: 'fact' },
+        { text: 'She told me, and I quote, "make sure none of this ever surfaces."', weakness: 'email_thread', obj: 'hearsay', hint: 'That phrasing appears nowhere in any written record.', type: 'misleading' },
+        { text: 'The ledger files were last accessed under her login at 11:47 PM.', weakness: 'access_badge_log', obj: null, hint: 'Someone else used her credentials.', type: 'technical' },
+        { text: 'I have never been pressured to alter any record in my time here.', weakness: 'internal_memo', obj: null, hint: 'A memo proves he was explicitly asked to revise a Q3 summary.', type: 'partial_lie' },
+        { text: 'I found a shredded document in her recycling bin with the ledger header.', weakness: 'financial_ledger', obj: 'relevance', hint: 'The ledger was digitally backed up — shredding one copy proves nothing.', type: 'trap' },
+        { text: 'Ms. Reeves was the only person with authority to delete those files permanently.', weakness: 'access_badge_log', obj: 'speculation', hint: 'IT records show two other admins had identical delete permissions.', type: 'final_contradiction' }
+      ]
+    },
+
+    /* 2 — STOLEN SKETCH */
+    {
+      title: 'Stolen Sketch',
+      intro: 'Rising fashion designer Celeste Mura claims rival house Darevka stole her concept sketches for their headline collection. Darevka says they developed the designs independently.',
+      category: 'intellectual_property',
+      pattern: 'contradictionChain',
+      diff: 2,
+      reward: 1600,
+      opponent: { name: 'Counsel Varga', personality: 'charming', tieColor: '#8b1a1a', hairColor: '#c8a060' },
+      witness: { name: 'Pierre Adoux', role: 'Lead Designer, Darevka' },
+      evidencePool: ['email_thread','timeline_contradiction','witness_statement','security_footage','redline_draft','calendar_invite'],
+      statements: [
+        { text: 'Our collection concept was finalized internally three months before Ms. Mura went public.', weakness: 'timeline_contradiction', obj: null, hint: 'Her sketchbook timestamps predate their internal deadline.', type: 'alibi' },
+        { text: 'We have never had any contact with Ms. Mura or anyone in her studio.', weakness: 'email_thread', obj: 'hearsay', hint: 'An email chain references a private design summit where both parties attended.', type: 'partial_lie' },
+        { text: 'The similarities are coincidental — silhouette trends cycle naturally in fashion.', weakness: 'redline_draft', obj: 'speculation', hint: 'The redline draft contains a unique asymmetric pleat that appears verbatim in Darevka's show.', type: 'misleading' },
+        { text: 'Our design process is entirely in-house and never relies on outside sources.', weakness: 'witness_statement', obj: null, hint: 'A freelance consultant who worked for Celeste also consulted for Darevka that season.', type: 'technical' },
+        { text: 'Security footage shows no unauthorized access to our studio archive.', weakness: 'security_footage', obj: null, hint: 'The footage has a six-hour gap on the disputed night.', type: 'trap' },
+        { text: 'I designed every stitch of that collection myself — I am the sole creative mind here.', weakness: 'redline_draft', obj: null, hint: 'The redline shows a different designer's initials on the pivotal jacket sketch.', type: 'final_contradiction' }
+      ]
+    },
+
+    /* 3 — FORGED AT THE SUMMIT */
+    {
+      title: 'Forged at the Summit',
+      intro: 'A landmark merger contract bears the signature of CEO Eliot Marsh — but Marsh claims he was thousands of miles away at a conference when it was signed.',
+      category: 'fraud',
+      pattern: 'trapCase',
+      diff: 3,
+      reward: 2200,
+      opponent: { name: 'Attorney Crane', personality: 'aggressive', tieColor: '#1a3a5c', hairColor: '#e8d0a0' },
+      witness: { name: 'Sandra Quill', role: 'Notary Public' },
+      evidencePool: ['signed_contract','phone_record','timeline_contradiction','calendar_invite','security_footage','witness_statement'],
+      statements: [
+        { text: 'I witnessed Mr. Marsh sign this contract in my office on the fourteenth.', weakness: 'timeline_contradiction', obj: null, hint: 'Flight records place Marsh in Geneva that morning.', type: 'alibi' },
+        { text: 'He presented valid photo identification before I notarized the document.', weakness: 'security_footage', obj: null, hint: 'Office security footage shows a different build than Marsh.', type: 'fact' },
+        { text: 'I have notarized hundreds of documents for this firm without incident.', weakness: 'witness_statement', obj: 'relevance', hint: 'A prior complaint about a notarized forgery was filed against her two years ago.', type: 'misleading' },
+        { text: 'The signature is identical to samples I compared before notarizing.', weakness: 'signed_contract', obj: 'speculation', hint: 'A forensic handwriting expert finds three structural deviations.', type: 'technical' },
+        { text: 'Mr. Marsh called me the following day to confirm receipt — I recognize his voice.', weakness: 'phone_record', obj: 'hearsay', hint: 'Phone records show no call from Marsh's number that day.', type: 'trap' },
+        { text: 'I am absolutely certain it was him. I looked him in the eye.', weakness: 'timeline_contradiction', obj: null, hint: 'He was on a panel in Geneva at that exact hour — live-streamed.', type: 'final_contradiction' }
+      ]
+    },
+
+    /* 4 — GALA AFTER DARK */
+    {
+      title: 'Gala After Dark',
+      intro: 'Socialite Vera Ashton claims philanthropist Edmund Frey made blackmail threats at a charity gala. Frey's camp says it never happened and is suing for defamation.',
+      category: 'defamation',
+      pattern: 'emotionalAppeal',
+      diff: 2,
+      reward: 1700,
+      opponent: { name: 'Mr. Solis', personality: 'smooth', tieColor: '#2d5a2d', hairColor: '#4a4a4a' },
+      witness: { name: 'Diana Cross', role: 'Event Coordinator' },
+      evidencePool: ['witness_statement','phone_record','security_footage','email_thread','calendar_invite','settlement_draft'],
+      statements: [
+        { text: 'I was stationed near the east wing all evening. Mr. Frey and Ms. Ashton never spoke alone.', weakness: 'security_footage', obj: null, hint: 'Footage shows both in the garden corridor — away from staff — for eleven minutes.', type: 'alibi' },
+        { text: 'Ms. Ashton seemed perfectly at ease throughout the night. No distress at all.', weakness: 'witness_statement', obj: 'speculation', hint: 'Another guest recalls her visibly shaken just before midnight.', type: 'misleading' },
+        { text: 'Mr. Frey is a trusted patron of this organization. He would never behave that way.', weakness: 'email_thread', obj: 'relevance', hint: 'An internal email shows the org received a prior complaint about Frey at a 2022 event.', type: 'emotional' },
+        { text: 'I reviewed the guest log and no private room was reserved or accessed that night.', weakness: 'security_footage', obj: null, hint: 'The garden corridor has no log — it's an open-air space not covered in the guest register.', type: 'technical' },
+        { text: 'Ms. Ashton left the event early without saying goodbye to anyone — very odd behavior.', weakness: 'phone_record', obj: 'speculation', hint: 'Her phone shows a call to her attorney placed from the parking lot at 11:58 PM.', type: 'trap' },
+        { text: 'There were always at least two staff members within earshot of both of them.', weakness: 'security_footage', obj: null, hint: 'The garden footage contradicts this — they were alone for over ten minutes.', type: 'final_contradiction' }
+      ]
+    },
+
+    /* 5 — SABOTAGE AT NEXCORE */
+    {
+      title: 'Sabotage at Nexcore',
+      intro: 'A deliberate malware deployment crippled Nexcore's server farm hours before their IPO. Your client, IT director Kenji Hara, is charged with corporate sabotage.',
+      category: 'cyber',
+      pattern: 'proceduralBattle',
+      diff: 3,
+      reward: 2400,
+      opponent: { name: 'DA Powell', personality: 'relentless', tieColor: '#2a2a6a', hairColor: '#d0c8b8' },
+      witness: { name: 'Tasha Irwin', role: 'Cybersecurity Analyst' },
+      evidencePool: ['access_badge_log','expert_report','internal_memo','email_thread','timeline_contradiction','phone_record'],
+      statements: [
+        { text: 'The malware was deployed using admin credentials assigned exclusively to Mr. Hara.', weakness: 'access_badge_log', obj: null, hint: 'Badge logs show Hara badged out two hours before deployment.', type: 'technical' },
+        { text: 'The attack signature matches tools found on a USB drive from his desk.', weakness: 'expert_report', obj: 'speculation', hint: 'The expert report notes those tools are freely available online and were on multiple machines.', type: 'misleading' },
+        { text: 'No other employee had the level of access required to execute this attack.', weakness: 'internal_memo', obj: null, hint: 'An internal memo from last quarter lists three other admins with equivalent permissions.', type: 'partial_lie' },
+        { text: 'Hara had motive: he was passed over for promotion the week before.', weakness: 'email_thread', obj: 'relevance', hint: 'Email records show he actually accepted the decision professionally in writing.', type: 'emotional' },
+        { text: 'The malware called back to an IP address registered to a VPN he subscribed to.', weakness: 'phone_record', obj: 'hearsay', hint: 'That VPN had 40,000 subscribers — and another Nexcore employee also used it.', type: 'trap' },
+        { text: 'I traced the lateral movement through the network directly to his workstation.', weakness: 'timeline_contradiction', obj: null, hint: 'Network timestamps show the lateral movement began while he was verified off-campus.', type: 'final_contradiction' }
+      ]
+    },
+
+    /* 6 — THE GHOST CLAIM */
+    {
+      title: 'The Ghost Claim',
+      intro: 'Insurance adjuster Rex Doyle is accused of filing $900K in fraudulent claims for a fire that may have been deliberately set. Your client swears the fire was accidental.',
+      category: 'insurance',
+      pattern: 'standardTrial',
+      diff: 2,
+      reward: 1900,
+      opponent: { name: 'Investigator Moss', personality: 'methodical', tieColor: '#3d3d3d', hairColor: '#888' },
+      witness: { name: 'Len Hatch', role: 'Fire Investigator' },
+      evidencePool: ['expert_report','financial_ledger','phone_record','timeline_contradiction','internal_memo','witness_statement'],
+      statements: [
+        { text: 'The origin point of the fire was inconsistent with an accidental electrical fault.', weakness: 'expert_report', obj: 'speculation', hint: 'A second independent report finds the wiring in that room was badly degraded.', type: 'technical' },
+        { text: 'Mr. Doyle increased his policy coverage to maximum just forty days prior.', weakness: 'timeline_contradiction', obj: 'relevance', hint: 'His mortgage lender required him to raise coverage as a loan condition.', type: 'misleading' },
+        { text: 'Accelerant traces were found at two separate points — fire doesn't just travel that way.', weakness: 'witness_statement', obj: null, hint: 'A neighbor confirms cleaning solvents were stored in both locations.', type: 'fact' },
+        { text: 'He stood to gain nearly a million dollars from this claim.', weakness: 'financial_ledger', obj: 'relevance', hint: 'The ledger shows the rebuild cost estimate actually exceeds the payout.', type: 'emotional' },
+        { text: 'He was unreachable for three hours before the fire was reported — no alibi.', weakness: 'phone_record', obj: null, hint: 'Phone records show he was on a call with his daughter for 90 minutes of that window.', type: 'trap' },
+        { text: 'In twenty years I have never seen an accidental fire with this pattern. Never.', weakness: 'expert_report', obj: 'speculation', hint: 'The defense expert presents three documented cases with nearly identical patterns ruled accidental.', type: 'final_contradiction' }
+      ]
+    },
+
+    /* 7 — THE LAST SIGNATURE */
+    {
+      title: 'The Last Signature',
+      intro: 'The Holloway family claims their ailing patriarch was manipulated into changing his will two days before his death. Your client, nurse Bea Stanton, is accused of undue influence.',
+      category: 'estate',
+      pattern: 'hostileWitness',
+      diff: 3,
+      reward: 2100,
+      opponent: { name: 'Counsel Fairfax', personality: 'smooth', tieColor: '#5a1f5a', hairColor: '#f0e0c0' },
+      witness: { name: 'Dr. Roland Venn', role: 'Attending Physician' },
+      evidencePool: ['witness_statement','signed_contract','internal_memo','email_thread','phone_record','calendar_invite'],
+      statements: [
+        { text: 'Mr. Holloway had moderate cognitive impairment. He was not of full testamentary capacity.', weakness: 'signed_contract', obj: 'speculation', hint: 'The will itself includes a capacity assessment signed by two witnesses that same morning.', type: 'technical' },
+        { text: 'Nurse Stanton was alone with him for extended periods, contrary to protocol.', weakness: 'internal_memo', obj: null, hint: 'The care home's own duty roster shows her standard supervised rotations.', type: 'misleading' },
+        { text: 'He never mentioned changing his will in any of our prior conversations.', weakness: 'email_thread', obj: 'hearsay', hint: 'An email from Holloway to his attorney three weeks prior explicitly mentions updating his estate plan.', type: 'partial_lie' },
+        { text: 'The signature on the amended will shows tremor inconsistent with his normal hand.', weakness: 'witness_statement', obj: 'speculation', hint: 'A handwriting expert testifies that tremor variation is normal in late-stage illness and matches his other documents.', type: 'technical' },
+        { text: 'She was the sole beneficiary added in the amendment — that's a clear red flag.', weakness: 'signed_contract', obj: 'relevance', hint: 'The amendment also removed a prior beneficiary who had been estranged for a decade.', type: 'emotional' },
+        { text: 'In my medical opinion, he could not have made that decision independently.', weakness: 'calendar_invite', obj: 'speculation', hint: 'His own attorney noted he was "sharp and deliberate" at their final meeting — the same afternoon.', type: 'final_contradiction' }
+      ]
+    },
+
+    /* 8 — THE HATCHER COLLECTION */
+    {
+      title: 'The Hatcher Collection',
+      intro: 'Three Impressionist paintings vanished from the Hatcher Gallery the night of its gala. Your client, gallery director Nora Feld, is accused of orchestrating the theft for insurance payout.',
+      category: 'theft',
+      pattern: 'surpriseWitness',
+      diff: 3,
+      reward: 2300,
+      opponent: { name: 'Prosecutor Amado', personality: 'aggressive', tieColor: '#8b4a00', hairColor: '#1a1a1a' },
+      witness: { name: 'Conrad Bast', role: 'Security Consultant' },
+      evidencePool: ['security_footage','access_badge_log','financial_ledger','settlement_draft','expert_report','witness_statement'],
+      statements: [
+        { text: 'The alarm was disabled from inside using an override code only Ms. Feld possessed.', weakness: 'access_badge_log', obj: null, hint: 'Badge records show the alarm tech who serviced the system also knew the code.', type: 'technical' },
+        { text: 'Security footage shows a deliberate blind spot left uncovered during the gala.', weakness: 'security_footage', obj: 'speculation', hint: 'The camera positioning was unchanged from the previous six events.', type: 'misleading' },
+        { text: 'She had heavily insured the collection just weeks before — classic pre-theft behavior.', weakness: 'financial_ledger', obj: 'relevance', hint: 'The gallery's insurers required updated coverage as a renewal condition.', type: 'emotional' },
+        { text: 'A delivery van parked outside for forty minutes during the gala was never identified.', weakness: 'expert_report', obj: 'hearsay', hint: 'Neighboring business CCTV shows it belonged to a catering supplier with a documented booking.', type: 'trap' },
+        { text: 'Ms. Feld was unusually calm when she reported the theft the next morning.', weakness: 'witness_statement', obj: 'speculation', hint: 'Her assistant confirms she broke down immediately after calling police and had to be sedated.', type: 'misleading' },
+        { text: 'I have secured dozens of high-value collections. This theft required inside knowledge. Absolute certainty.', weakness: 'security_footage', obj: 'speculation', hint: 'The footage shows the thieves spent nine minutes fumbling with the wrong cabinet before finding the right one — not inside knowledge.', type: 'final_contradiction' }
+      ]
+    },
+
+    /* 9 — THE CRESTFALL NDA */
+    {
+      title: 'The Crestfall NDA',
+      intro: 'Whistleblower Anya Sorel spoke to the press about safety violations at Crestfall Pharma. The company is suing for breach of her NDA. You're defending the right to speak.',
+      category: 'whistleblower',
+      pattern: 'mediaTrial',
+      diff: 3,
+      reward: 2000,
+      opponent: { name: 'Partner Hollis', personality: 'methodical', tieColor: '#003366', hairColor: '#c8c0b0' },
+      witness: { name: 'Gregg Ness', role: 'Head of Compliance, Crestfall' },
+      evidencePool: ['nda_clause','internal_memo','expert_report','email_thread','whistle_file','settlement_draft'],
+      statements: [
+        { text: 'Ms. Sorel signed a comprehensive NDA covering all internal communications without exception.', weakness: 'nda_clause', obj: null, hint: 'The NDA contains a statutory carve-out for disclosures made to regulators or in the public interest.', type: 'fact' },
+        { text: 'The safety concerns she raised had already been addressed internally before she went public.', weakness: 'internal_memo', obj: null, hint: 'Internal memos from that period show the issues were flagged but not acted upon for six months.', type: 'partial_lie' },
+        { text: 'Her disclosures were motivated by a personal grievance, not genuine safety concerns.', weakness: 'whistle_file', obj: 'speculation', hint: 'The whistleblower file contains independent safety data predating any personnel dispute.', type: 'emotional' },
+        { text: 'We have a spotless regulatory compliance record over the past five years.', weakness: 'expert_report', obj: 'relevance', hint: 'An FDA expert report from last year cites three unresolved corrective action plans at Crestfall.', type: 'misleading' },
+        { text: 'Other employees reviewed the same data and concluded there was no safety risk.', weakness: 'email_thread', obj: 'hearsay', hint: 'One of those employees emailed HR privately expressing concern — their name is redacted but the email exists.', type: 'trap' },
+        { text: 'No actual harm came from these alleged violations. This is theoretical at best.', weakness: 'whistle_file', obj: null, hint: 'The file includes two patient adverse event reports tied directly to the flagged process.', type: 'final_contradiction' }
+      ]
+    },
+
+    /* 10 — THE PRECINCT PROBLEM */
+    {
+      title: 'The Precinct Problem',
+      intro: 'Officer Davan Reid is accused of planting evidence in the arrest of Theo Canin. Your client, Canin, spent eight months in pre-trial detention. Reid denies everything.',
+      category: 'misconduct',
+      pattern: 'judgePressure',
+      diff: 3,
+      reward: 2500,
+      opponent: { name: 'State Counsel Breck', personality: 'aggressive', tieColor: '#4a0000', hairColor: '#3a3a3a' },
+      witness: { name: 'Sgt. Dana Reid', role: 'Arresting Officer' },
+      evidencePool: ['security_footage','access_badge_log','phone_record','witness_statement','timeline_contradiction','expert_report'],
+      statements: [
+        { text: 'I found the firearm under the passenger seat during a routine stop. Standard procedure.', weakness: 'timeline_contradiction', obj: null, hint: 'Dispatch records show the stop was called in twelve minutes before Reid radioed finding the weapon — and the search should take thirty seconds.', type: 'alibi' },
+        { text: 'Mr. Canin was acting suspiciously and matching the description of a suspect in the area.', weakness: 'phone_record', obj: 'speculation', hint: 'The suspect description broadcast was issued twenty minutes after the stop began.', type: 'misleading' },
+        { text: 'My body camera malfunctioned. It happens — equipment fails.', weakness: 'expert_report', obj: null, hint: 'A forensic tech report shows the camera was manually powered off, not malfunctioned.', type: 'partial_lie' },
+        { text: 'The weapon matched caliber to an open case — I was doing my job connecting the dots.', weakness: 'security_footage', obj: 'relevance', hint: 'Nearby ATM footage shows Canin at a gas station two miles away at the time of the original incident.', type: 'technical' },
+        { text: 'No one at the scene disputed my account at the time.', weakness: 'witness_statement', obj: null, hint: 'A passenger in the next lane filed a complaint that evening describing the officer reaching into his own jacket before approaching the car.', type: 'trap' },
+        { text: 'I have served this precinct with distinction for eleven years. My record speaks for itself.', weakness: 'access_badge_log', obj: 'relevance', hint: 'Precinct records include two prior misconduct complaints against Reid, both quietly settled.', type: 'final_contradiction' }
+      ]
+    },
+
+    /* 11 — THE ALDGATE AFFAIR */
+    {
+      title: 'The Aldgate Affair',
+      intro: 'Property developer Hugo Aldgate is accused of bribing a city councilman to rezone a waterfront lot. Your client, his business partner Pria Mehta, is charged as co-conspirator.',
+      category: 'corruption',
+      pattern: 'contradictionChain',
+      diff: 4,
+      reward: 3000,
+      opponent: { name: 'Prosecutor Yuen', personality: 'relentless', tieColor: '#003333', hairColor: '#ccb888' },
+      witness: { name: 'Cllr. Frank Dowe', role: 'City Councilman' },
+      evidencePool: ['financial_ledger','email_thread','phone_record','calendar_invite','settlement_draft','board_minutes'],
+      statements: [
+        { text: 'Ms. Mehta personally delivered an envelope to my office containing twenty thousand dollars.', weakness: 'calendar_invite', obj: null, hint: 'Her calendar shows she was presenting at an out-of-city conference that day.', type: 'alibi' },
+        { text: 'The payment was in exchange for my support on the rezoning application.', weakness: 'financial_ledger', obj: 'hearsay', hint: 'The financial ledger shows the payment Dowe received came from a PAC fund, not from Mehta or Aldgate.', type: 'misleading' },
+        { text: 'I was pressured into supporting the rezoning against my better judgment.', weakness: 'board_minutes', obj: 'speculation', hint: 'Board minutes from that session show him championing the rezoning unprompted before any contact was made.', type: 'emotional' },
+        { text: 'Aldgate and Mehta met with me privately to discuss what they called "mutual benefits."', weakness: 'phone_record', obj: null, hint: 'Phone records show no direct calls between Dowe and Mehta in the six months prior.', type: 'partial_lie' },
+        { text: 'I documented the bribe and reported it internally. I was a victim of their scheme.', weakness: 'email_thread', obj: null, hint: 'His own emails from that period never mention the bribe — only enthusiasm for the development.', type: 'trap' },
+        { text: 'I want full immunity in exchange for this testimony. I deserve protection for coming forward.', weakness: 'settlement_draft', obj: 'relevance', hint: 'The immunity deal reveals Dowe faces his own corruption charges — his testimony is self-serving.', type: 'final_contradiction' }
+      ]
+    },
+
+    /* 12 — THE PARTNER PROBLEM */
+    {
+      title: 'The Partner Problem',
+      intro: 'Senior partner Oliver Nash is pushed out of his own firm and sues for wrongful dissolution. His former partner, Grace Ellery, claims he breached fiduciary duty by secret dealings.',
+      category: 'partnership',
+      pattern: 'surpriseWitness',
+      diff: 4,
+      reward: 2800,
+      opponent: { name: 'Ms. Cheng', personality: 'charming', tieColor: '#1a1a4a', hairColor: '#e8e0d0' },
+      witness: { name: 'Oliver Nash', role: 'Plaintiff / Former Partner' },
+      evidencePool: ['signed_contract','board_minutes','email_thread','financial_ledger','redline_draft','nda_clause'],
+      statements: [
+        { text: 'I never solicited clients away from the firm while still a partner. That would be a clear breach.', weakness: 'email_thread', obj: null, hint: 'An email thread shows him cc'd on pitches sent from a new LLC registered in his wife's name.', type: 'partial_lie' },
+        { text: 'The partnership agreement grants me guaranteed equity regardless of removal circumstances.', weakness: 'signed_contract', obj: null, hint: 'The agreement contains a misconduct forfeiture clause — and the redline shows Nash himself drafted it.', type: 'fact' },
+        { text: 'Grace never raised any concerns about my conduct at any board meeting.', weakness: 'board_minutes', obj: null, hint: 'Minutes from the March session document her formal objection to his billing practices.', type: 'misleading' },
+        { text: 'The financial discrepancies are accounting errors — not intentional misappropriation.', weakness: 'financial_ledger', obj: 'speculation', hint: 'The ledger shows the same line item redirected to his personal account across eleven consecutive months.', type: 'technical' },
+        { text: 'My NDA prevents me from disclosing the real reason I was pushed out — it would destroy this firm.', weakness: 'nda_clause', obj: 'relevance', hint: 'The NDA was signed after the dissolution — it cannot retroactively cover the misconduct at issue.', type: 'trap' },
+        { text: 'I built this firm from nothing. Everything that office is worth — that is my legacy.', weakness: 'redline_draft', obj: 'relevance', hint: 'The founding documents show the firm's core client base came entirely from Ellery's prior relationships.', type: 'final_contradiction' }
+      ]
+    }
+
+  ];
+
+  /* Push new cases into the global CASES array, avoiding duplicates by title */
+  var existingTitles = CASES.map(function(c){ return c.title; });
+  newCases.forEach(function(nc){
+    if (existingTitles.indexOf(nc.title) === -1) {
+      CASES.push(nc);
+    }
+  });
+
+  console.log('[newCasePack_v2] ' + newCases.length + ' cases added. Total cases: ' + CASES.length);
+})();
+
+/* ============================================================
+   TRIAL VARIETY v1
+   — Patterns, random events, dialogue pools, character states,
+     visual stamps, foundation tracking, opponent AI, verdict FX
+   ============================================================ */
+(function trialVariety_v1() {
+  if (typeof Game === 'undefined' || typeof S === 'undefined') {
+    console.warn('[trialVariety_v1] Game or S not found'); return;
+  }
+
+  /* ── Trial Patterns ── */
+  var TRIAL_PATTERNS = {
+    standardTrial:        { name: 'Standard Trial',        hint: 'A balanced trial. No gimmicks.',                             opponentBias: 0,    judgeStrictness: 1,    eventRate: 0.12 },
+    hostileWitness:       { name: 'Hostile Witness',        hint: 'Witness fights every cross-examination.',                   opponentBias: 0.1,  judgeStrictness: 1.1,  eventRate: 0.18 },
+    evidenceSuppression:  { name: 'Evidence Suppression',   hint: 'Key evidence starts hidden. Investigate to reveal.',        opponentBias: 0.15, judgeStrictness: 1.2,  eventRate: 0.15 },
+    surpriseWitness:      { name: 'Surprise Witness',       hint: 'A second witness may appear mid-trial.',                    opponentBias: 0.1,  judgeStrictness: 1,    eventRate: 0.25 },
+    judgePressure:        { name: 'Judge Pressure',         hint: 'The judge is impatient. Every wasted move costs patience.', opponentBias: 0,    judgeStrictness: 1.5,  eventRate: 0.1  },
+    mediaTrial:           { name: 'Media Trial',            hint: 'Jury sympathy swings wildly with dramatic moments.',        opponentBias: 0.05, judgeStrictness: 1,    eventRate: 0.22 },
+    trapCase:             { name: 'Trap Case',              hint: 'Several statements are designed to lure wrong answers.',    opponentBias: 0.2,  judgeStrictness: 1.1,  eventRate: 0.1  },
+    contradictionChain:   { name: 'Contradiction Chain',    hint: 'Statements must be dismantled in sequence.',                opponentBias: 0.1,  judgeStrictness: 1,    eventRate: 0.14 },
+    proceduralBattle:     { name: 'Procedural Battle',      hint: 'Wrong objection types trigger immediate penalties.',        opponentBias: 0.15, judgeStrictness: 1.3,  eventRate: 0.1  },
+    emotionalAppeal:      { name: 'Emotional Appeal',       hint: 'Emotional statements sway the jury more than facts.',       opponentBias: 0.05, judgeStrictness: 0.9,  eventRate: 0.2  }
+  };
+
+  /* Apply pattern modifiers when a case starts */
+  var _origEnterCourtroom = Game.enterCourtroom && Game.enterCourtroom.bind(Game);
+  if (_origEnterCourtroom) {
+    Game.enterCourtroom = function() {
+      _origEnterCourtroom.apply(this, arguments);
+      var cd = S.caseData;
+      if (!cd) return;
+      var pat = TRIAL_PATTERNS[cd.pattern] || TRIAL_PATTERNS.standardTrial;
+      S.court._pattern = pat;
+      S.court._foundation = {};
+      S.court._characterState = { player: 'neutral', opp: 'neutral', witness: 'neutral' };
+      S.court._stmtTypeHistory = [];
+      /* Show pattern badge in UI */
+      var tactics = document.getElementById('tacticTip');
+      if (tactics) {
+        tactics.innerHTML = pat.hint +
+          '<span class="pattern-badge">' + pat.name + '</span>';
+      }
+      /* Suppress certain evidence items in evidenceSuppression pattern */
+      if (cd.pattern === 'evidenceSuppression' && S.court.evidence) {
+        var hidden = Math.floor(S.court.evidence.length / 2);
+        S.court._hiddenEvidence = S.court.evidence.splice(0, hidden);
+      }
+      _applyStmtTypeBadge();
+    };
+  }
+
+  /* ── Statement type badge in statement box ── */
+  function _applyStmtTypeBadge() {
+    var sc = S.court;
+    if (!sc || !sc.statements) return;
+    var stmts = sc.statements;
+    var idx = sc.stmtIndex || 0;
+    if (idx >= stmts.length) return;
+    var type = stmts[idx].type || 'fact';
+    var whoEl = document.getElementById('whoTalking');
+    if (whoEl) {
+      var existing = whoEl.querySelector('.stmt-type-badge');
+      if (existing) existing.remove();
+      var badge = document.createElement('span');
+      badge.className = 'stmt-type-badge stmt-type-' + type;
+      badge.textContent = type.replace('_', ' ');
+      whoEl.appendChild(badge);
+    }
+  }
+
+  /* ── Random Court Events ── */
+  var COURT_EVENTS = [
+    {
+      id: 'judgeWarning',
+      label: '⚖ JUDGE WARNING',
+      msg: 'The judge interrupts: "Counsel, I am losing patience with this line of questioning."',
+      apply: function(sc){ sc.judgePatience = Math.max(0, (sc.judgePatience||100) - 12); }
+    },
+    {
+      id: 'witnessHesitation',
+      label: '😰 WITNESS HESITATION',
+      msg: 'The witness hesitates, glancing nervously at the gallery before answering.',
+      apply: function(sc){ sc.witnessConf = Math.max(0, (sc.witnessConf||100) - 8); }
+    },
+    {
+      id: 'newEvidenceEmerges',
+      label: '📂 NEW EVIDENCE',
+      msg: 'A courier arrives with a sealed envelope. New evidence has entered the record.',
+      apply: function(sc){
+        if (sc._hiddenEvidence && sc._hiddenEvidence.length) {
+          var revealed = sc._hiddenEvidence.splice(0, 1)[0];
+          if (sc.evidence) sc.evidence.push(revealed);
+          _showToast('📂 NEW EVIDENCE: ' + revealed.replace(/_/g,' ').toUpperCase());
+        }
+      }
+    },
+    {
+      id: 'juryReaction',
+      label: '🗣 JURY STIRS',
+      msg: 'The jury murmurs audibly. The foreman makes a note.',
+      apply: function(sc){ sc.jury = Math.min(100, Math.max(-100, (sc.jury||0) + (Math.random() > 0.5 ? 8 : -6))); }
+    },
+    {
+      id: 'witnessChangesStatement',
+      label: '⚡ STATEMENT CHANGE',
+      msg: 'The witness abruptly revises their prior answer, catching everyone off guard.',
+      apply: function(sc){
+        var idx = sc.stmtIndex || 0;
+        if (sc.statements && sc.statements[idx]) {
+          sc.statements[idx].hint = '(Revised) The witness just contradicted themselves — attack directly.';
+        }
+      }
+    },
+    {
+      id: 'mediaLeak',
+      label: '📰 MEDIA LEAK',
+      msg: 'Breaking: the media has obtained leaked documents relating to this case. Jury sympathy surges.',
+      apply: function(sc){ sc.jury = Math.min(100, (sc.jury||0) + 15); _flashScreen('gold'); }
+    },
+    {
+      id: 'recess',
+      label: '☕ SUDDEN RECESS',
+      msg: 'The judge calls a five-minute recess. Both sides reset slightly.',
+      apply: function(sc){
+        sc.playerCred = Math.min(100, (sc.playerCred||100) + 5);
+        sc.judgePatience = Math.min(100, (sc.judgePatience||100) + 10);
+      }
+    },
+    {
+      id: 'expertArrives',
+      label: '🔬 EXPERT ARRIVES',
+      msg: 'An unexpected expert witness requests to take the stand. The judge allows a brief statement.',
+      apply: function(sc){ sc.witnessConf = Math.min(100, (sc.witnessConf||100) - 15); }
+    }
+  ];
+
+  function _maybeFireEvent() {
+    var sc = S.court;
+    if (!sc || !sc._pattern) return;
+    var rate = sc._pattern.eventRate || 0.12;
+    if (Math.random() > rate) return;
+    var ev = COURT_EVENTS[Math.floor(Math.random() * COURT_EVENTS.length)];
+    _showToast(ev.label + ' — ' + ev.msg);
+    ev.apply(sc);
+    _logLine('📋 ' + ev.msg);
+  }
+
+  /* ── Dialogue pools per case category ── */
+  var DIALOGUE_POOLS = {
+    financial:    ['Follow the money, counsel.', 'Numbers don't lie. Witnesses do.', 'The ledger never forgets.'],
+    cyber:        ['The digital trail is immutable.', 'Logs timestamp every action.', 'You can't undelete intent.'],
+    theft:        ['Possession is not proof. Presence is.', 'What motive explains the timeline?', 'Opportunity without proof is suspicion.'],
+    fraud:        ['Every forgery leaves a seam.', 'The truth is always in the details.', 'Signatures carry the weight of identity.'],
+    defamation:   ['Words have consequences, Counsel.', 'Context is everything in a claim.', 'Reputation, once damaged, is hard to restore.'],
+    estate:       ['The dead cannot speak for themselves.', 'Intent is written between the lines.', 'A signature at the end of life deserves scrutiny.'],
+    misconduct:   ['Power without accountability corrupts procedure.', 'The badge is not a shield from the law.', 'Procedure exists to protect the innocent.'],
+    corruption:   ['Public trust is not a bargaining chip.', 'Every deal leaves a paper trail.', 'Where money flows, motive follows.'],
+    whistleblower:['Silence can be its own form of harm.', 'The law distinguishes duty from betrayal.', 'Truth told at great cost deserves protection.'],
+    intellectual_property: ['Ideas have authors.', 'Creation leaves a traceable history.', 'Inspiration and imitation are not the same thing.'],
+    insurance:    ['Coincidence is not causation.', 'The timing tells the real story.', 'Claims require more than paperwork.'],
+    partnership:  ['Trust is the foundation of every partnership.', 'Breach of fiduciary duty leaves traces everywhere.', 'Loyalty cuts both ways.']
+  };
+
+  function _getDialogueLine(category) {
+    var pool = DIALOGUE_POOLS[category] || DIALOGUE_POOLS.financial;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  /* ── Inject dialogue line into log after each statement ── */
+  function _logLine(txt) {
+    var log = document.getElementById('courtLog');
+    if (!log) return;
+    var p = document.createElement('p');
+    p.textContent = txt;
+    log.prepend(p);
+  }
+
+  /* ── Toast notification ── */
+  function _showToast(msg) {
+    var el = document.createElement('div');
+    el.className = 'court-event-toast';
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(function(){ if (el.parentNode) el.parentNode.removeChild(el); }, 3400);
+  }
+
+  /* ── Screen flash ── */
+  function _flashScreen(color) {
+    var el = document.createElement('div');
+    el.className = 'court-cutscene-flash ' + (color || 'white');
+    document.body.appendChild(el);
+    setTimeout(function(){ if (el.parentNode) el.parentNode.removeChild(el); }, 600);
+  }
+
+  /* ── Dramatic stamp (OBJECTION! etc.) ── */
+  function _showStamp(word, cls) {
+    var el = document.createElement('div');
+    el.className = 'court-stamp-text ' + (cls || '');
+    el.textContent = word;
+    document.body.appendChild(el);
+    setTimeout(function(){ if (el.parentNode) el.parentNode.removeChild(el); }, 2000);
+  }
+
+  /* ── Spotlight effect ── */
+  function _showSpotlight(xPct, yPct) {
+    var el = document.createElement('div');
+    el.className = 'court-spotlight';
+    el.style.setProperty('--sx', xPct + '%');
+    el.style.setProperty('--sy', yPct + '%');
+    document.body.appendChild(el);
+    setTimeout(function(){ if (el.parentNode) el.parentNode.removeChild(el); }, 2700);
+  }
+
+  /* ── Character state updater ── */
+  function _setCharState(who, state) {
+    var sc = S.court;
+    if (!sc || !sc._characterState) return;
+    sc._characterState[who] = state;
+    var wrap = document.getElementById('courtCanvasWrap');
+    if (!wrap) return;
+    if (who === 'player')  wrap.dataset.pstate = state;
+    if (who === 'opp')     wrap.dataset.ostate = state;
+    if (who === 'witness') wrap.dataset.wstate = state;
+  }
+
+  /* ── Verdict confetti ── */
+  function _fireVerdictFanfare(won) {
+    var container = document.createElement('div');
+    container.className = 'verdict-fanfare';
+    var colors = won
+      ? ['#f4d058','#d4a82c','#4a7fd4','#5aaa4a','#fff']
+      : ['#d44a3a','#555','#888','#333'];
+    for (var i = 0; i < 60; i++) {
+      var p = document.createElement('div');
+      p.className = 'verdict-fanfare-particle';
+      p.style.left = Math.random() * 100 + '%';
+      p.style.background = colors[Math.floor(Math.random() * colors.length)];
+      p.style.setProperty('--dur',  (0.8 + Math.random() * 1.4) + 's');
+      p.style.setProperty('--delay',(Math.random() * 0.6) + 's');
+      container.appendChild(p);
+    }
+    document.body.appendChild(container);
+    setTimeout(function(){ if (container.parentNode) container.parentNode.removeChild(container); }, 3000);
+  }
+
+  /* ── Hook into afterPlayerTurn for events + state updates ── */
+  var _origAfterTurn = Game.afterPlayerTurn && Game.afterPlayerTurn.bind(Game);
+  if (_origAfterTurn) {
+    Game.afterPlayerTurn = function(result) {
+      _origAfterTurn.apply(this, arguments);
+      var sc = S.court;
+      if (!sc) return;
+
+      /* Fire random event */
+      _maybeFireEvent();
+
+      /* Update statement type badge for next statement */
+      _applyStmtTypeBadge();
+
+      /* Inject category-flavored dialogue line */
+      var cat = (S.caseData && S.caseData.category) || 'financial';
+      if (Math.random() < 0.35) {
+        _logLine('"' + _getDialogueLine(cat) + '"');
+      }
+
+      /* Character state driven by score */
+      var playerCred = sc.playerCred || 100;
+      var oppCred    = sc.oppCred    || 100;
+      var witConf    = sc.witnessConf || 100;
+
+      if      (playerCred < 30)  _setCharState('player', 'panicking');
+      else if (playerCred < 55)  _setCharState('player', 'rattled');
+      else if (playerCred > 85 && oppCred < 40) _setCharState('player', 'triumphant');
+      else                       _setCharState('player', 'neutral');
+
+      if      (oppCred < 30)    _setCharState('opp', 'panicking');
+      else if (oppCred > 80)    _setCharState('opp', 'smug');
+      else                      _setCharState('opp', 'neutral');
+
+      if      (witConf < 25)    _setCharState('witness', 'broken');
+      else if (witConf < 50)    _setCharState('witness', 'rattled');
+      else                      _setCharState('witness', 'neutral');
+
+      /* Witness breakdown scene */
+      if (witConf < 25 && sc._witnessBreakdownFired !== true) {
+        sc._witnessBreakdownFired = true;
+        var wrap = document.getElementById('courtCanvasWrap');
+        if (wrap) wrap.classList.add('court-witness-breakdown');
+        setTimeout(function(){
+          if (wrap) wrap.classList.remove('court-witness-breakdown');
+        }, 950);
+        _flashScreen('white');
+        _showToast('💥 WITNESS BREAKDOWN — confidence shattered!');
+      }
+
+      /* Spotlight on Dramatic Reveal */
+      if (result && result.action === 'dramatic_reveal') {
+        _showSpotlight(30, 55);
+      }
+    };
+  }
+
+  /* ── Hook presentEvidence for objection stamp + foundation tracking ── */
+  var _origPresent = Game.presentEvidence && Game.presentEvidence.bind(Game);
+  if (_origPresent) {
+    Game.presentEvidence = function(eid) {
+      var sc = S.court;
+      /* Foundation tracking: some evidence requires prior cross-examination */
+      if (sc && sc._pattern && sc._pattern.name === 'Procedural Battle') {
+        var stmtIdx = sc.stmtIndex || 0;
+        var stmt = sc.statements && sc.statements[stmtIdx];
+        if (stmt && stmt.type === 'technical' && !(sc._foundation && sc._foundation[stmtIdx])) {
+          _showToast('⚠ FOUNDATION REQUIRED — Cross-examine first to lay the groundwork.');
+          _flashScreen('red');
+          sc.judgePatience = Math.max(0, (sc.judgePatience || 100) - 8);
+          return;
+        }
+      }
+      _origPresent.apply(this, arguments);
+      /* Check if it was a hit */
+      if (sc && sc.statements) {
+        var idx = sc.stmtIndex || 0;
+        var s = sc.statements[idx];
+        if (s && s.weakness === eid) {
+          _flashScreen('gold');
+          _showStamp('CONTRADICTED!', 'contradiction');
+          _showSpotlight(50, 40);
+        }
+      }
+    };
+  }
+
+  /* ── Hook objection for stamp ── */
+  var _origObj = Game.doObjection && Game.doObjection.bind(Game);
+  if (_origObj) {
+    Game.doObjection = function(type) {
+      _origObj.apply(this, arguments);
+      var sc = S.court;
+      if (!sc) return;
+      var stmtIdx = sc.stmtIndex || 0;
+      var stmt = sc.statements && sc.statements[stmtIdx];
+      var correct = stmt && stmt.obj && stmt.obj === type;
+      if (correct) {
+        _showStamp('OBJECTION!', 'objection');
+        _flashScreen('white');
+      } else if (sc._pattern && sc._pattern.name === 'Procedural Battle') {
+        /* Wrong objection type in procedural battle — double penalty */
+        sc.judgePatience = Math.max(0, (sc.judgePatience || 100) - 15);
+        sc.playerCred    = Math.max(0, (sc.playerCred    || 100) - 8);
+        _flashScreen('red');
+        _showToast('⚖ OVERRULED — Wrong objection type. Judge loses patience.');
+      }
+    };
+  }
+
+  /* ── Hook cross-examine to set foundation flag ── */
+  var _origCourt = Game.courtAction && Game.courtAction.bind(Game);
+  if (_origCourt) {
+    Game.courtAction = function(id) {
+      if (id === 'cross' && S.court) {
+        var idx = S.court.stmtIndex || 0;
+        if (!S.court._foundation) S.court._foundation = {};
+        S.court._foundation[idx] = true;
+      }
+      if (id === 'hold_it') {
+        _showStamp('HOLD IT!', 'hold-it');
+      }
+      _origCourt.apply(this, arguments);
+    };
+  }
+
+  /* ── Enhanced opponent AI: pattern-aware ── */
+  var _origOppTurn = Game.opponentTurn && Game.opponentTurn.bind(Game);
+  if (_origOppTurn) {
+    Game.opponentTurn = function() {
+      var sc = S.court;
+      if (sc && sc._pattern) {
+        var bias = sc._pattern.opponentBias || 0;
+        /* Slightly skew opponent effectiveness based on pattern */
+        if (Math.random() < bias) {
+          /* Opponent gets a bonus action this turn */
+          sc.oppCred = Math.min(100, (sc.oppCred || 100) + 5);
+          sc.playerCred = Math.max(0, (sc.playerCred || 100) - 6);
+          _logLine('⚡ ' + ((S.caseData && S.caseData.opponent && S.caseData.opponent.name) || 'Opponent') + ' seizes the moment aggressively.');
+        }
+      }
+      _origOppTurn.apply(this, arguments);
+    };
+  }
+
+  /* ── Hook showVerdict for fanfare ── */
+  var _origVerdict = Game.showVerdict && Game.showVerdict.bind(Game);
+  if (_origVerdict) {
+    Game.showVerdict = function(won) {
+      _fireVerdictFanfare(won);
+      if (won) {
+        _showStamp('NOT GUILTY!', 'contradiction');
+        _flashScreen('gold');
+      } else {
+        _flashScreen('red');
+      }
+      setTimeout(function(){
+        _origVerdict.apply(Game, arguments);
+      }, 400);
+    };
+  }
+
+  /* ── hostileWitness: cross-exam costs extra confidence ── */
+  var _origRenderCourt = Game.renderCourt && Game.renderCourt.bind(Game);
+  if (_origRenderCourt) {
+    Game.renderCourt = function() {
+      _origRenderCourt.apply(this, arguments);
+      _applyStmtTypeBadge();
+    };
+  }
+
+  console.log('[trialVariety_v1] Patterns, events, dialogue, character states, stamps, spotlights, verdict fanfare loaded.');
+})();
