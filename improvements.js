@@ -3477,115 +3477,61 @@
 
 /* ============================================================
  * VISUAL & UI ENHANCEMENTS
- * Better canvas courtroom, homepage effects, evidence match glow,
- * combo toasts, and pixel-art polish.
+ * Wraps the original drawCourtroom to add extras on top:
+ * duel turn glow, speech bubble, homepage gold particles.
+ * Does NOT replace the original — fixes the previous bug.
  * ============================================================ */
 (function visualEnhancements() {
   if (typeof Canvas === 'undefined') return;
 
-  /* Enhanced canvas courtroom */
+  /* Wrap original drawCourtroom — call it first, then overlay extras */
+  const _origDrawCourtroom = Canvas.drawCourtroom.bind(Canvas);
   Canvas.drawCourtroom = function () {
+    _origDrawCourtroom(); // draws everything: judge, lawyers, witness, jurors, floor
+
     const ctx = this.ctx;
-    const W = this.w, H = this.h;
 
-    const sky = ctx.createLinearGradient(0, 0, 0, H);
-    sky.addColorStop(0, '#0e0520');
-    sky.addColorStop(0.4, '#1a1226');
-    sky.addColorStop(1, '#0d0818');
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, H);
-
-    this.px(0, 55, W, 125, PAL.wood);
-    for (let x = 0; x < W; x += 80) { this.px(x, 55, 2, 125, PAL.woodDark); }
-    ctx.globalAlpha = 0.07;
-    for (let i = 0; i < 5; i++) {
-      ctx.strokeStyle = '#e8c9a0'; ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(i * 180 + 20, 60);
-      ctx.bezierCurveTo(i * 180 + 40, 90, i * 180 + 10, 120, i * 180 + 50, 160);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-
-    const windows = [[40, 65, 80, 55], [620, 65, 80, 55]];
-    const self = this;
-    windows.forEach(function (arr) {
-      const wx = arr[0], wy = arr[1], ww = arr[2], wh = arr[3];
-      self.px(wx, wy, ww, wh, PAL.woodDark);
-      self.px(wx + 6, wy + 6, ww - 12, wh - 12, '#1a2a4a');
-      ctx.globalAlpha = 0.18 + 0.06 * Math.sin(Date.now() / 1200);
-      ctx.fillStyle = '#3a6ad4';
-      ctx.fillRect(wx + 6, wy + 6, (ww - 12) / 2 - 2, wh - 12);
-      ctx.fillStyle = '#7a3ab8';
-      ctx.fillRect(wx + 6 + (ww - 12) / 2 + 2, wy + 6, (ww - 12) / 2 - 2, wh - 12);
+    /* Duel turn indicator — gold glow on the active player's podium */
+    if (S.duel && S.duel.active) {
+      const p1Active = S.duel.turn === 1;
+      /* Podium positions from original: left=180,290 right=540,290 */
+      const gx = p1Active ? 178 : 538;
+      ctx.globalAlpha = 0.28 + 0.12 * Math.sin(this.frame * 0.12);
+      ctx.strokeStyle = '#ffdc5c';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(gx - 2, 287, 86, 36);
       ctx.globalAlpha = 1;
-      self.px(wx + (ww / 2) - 1, wy + 6, 2, wh - 12, PAL.woodDark);
-      self.px(wx + 6, wy + (wh / 2), ww - 12, 2, PAL.woodDark);
-    });
-
-    this.px(300, 60, 200, 80, PAL.wood);
-    ctx.globalAlpha = 0.25;
-    ctx.strokeStyle = PAL.gold; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(400, 110, 38, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(400, 110, 28, 0, Math.PI * 2); ctx.stroke();
-    ctx.globalAlpha = 1;
-    this.px(396, 95, 8, 30, PAL.woodDark);
-    this.px(388, 117, 24, 6, PAL.woodDark);
-
-    const t = Date.now() / 600;
-    const gravelX = 380 + Math.round(Math.sin(t) * 3);
-    const gravelY = 50 + Math.round(Math.abs(Math.sin(t * 0.5)) * 6);
-    this.px(gravelX, gravelY, 14, 6, '#8B6914');
-    this.px(gravelX + 2, gravelY + 4, 10, 14, '#7a5c0e');
-    this.px(gravelX + 4, gravelY + 16, 6, 3, '#5a3c0a');
-
-    this.px(0, 180, W, 8, PAL.woodDark);
-    this.px(0, 310, W, 50, PAL.floor);
-    this.px(0, 310, W, 4, '#1a1410');
-    for (let x = 0; x < W; x += 60) { this.px(x, 310, 2, 50, '#1a1410'); }
-
-    this.px(160, 188, 120, 100, PAL.wood);
-    this.px(520, 188, 120, 100, PAL.wood);
-    this.px(162, 186, 116, 4, PAL.gold);
-    this.px(522, 186, 116, 4, PAL.gold);
-    this.px(168, 192, 8, 6, '#d4c070');
-    this.px(184, 192, 8, 6, '#d4c070');
-    this.px(528, 192, 8, 6, '#d4c070');
-    this.px(544, 192, 8, 6, '#d4c070');
-
-    const isDuel = S.court && S.court.mode === 'duel';
-    if (isDuel && S.duel) {
-      const activeSide = S.duel.turn === 1 ? 160 : 520;
-      ctx.globalAlpha = 0.35 + 0.1 * Math.sin(Date.now() / 400);
+      ctx.font = 'bold 8px Courier New';
       ctx.fillStyle = '#ffdc5c';
-      ctx.fillRect(activeSide, 184, 120, 4);
+      ctx.textAlign = 'center';
+      ctx.fillText('◄ TURN', p1Active ? 220 : 580, 346);
+      ctx.textAlign = 'left';
+    }
+
+    /* Excited jury highlight when jury strongly favours one side */
+    const juryVal = (S.court && S.court.jury) || (S.duel && S.duel.jury) || 0;
+    if (Math.abs(juryVal) > 25) {
+      ctx.globalAlpha = 0.12 + 0.06 * Math.sin(this.frame * 0.18);
+      ctx.fillStyle = juryVal > 0 ? '#4488ff' : '#ff4444';
+      ctx.fillRect(45, 196, 130, 54);
       ctx.globalAlpha = 1;
     }
 
-    const juryMood = S.court ? S.court.jury || 0 : 0;
-    const excited = Math.abs(juryMood) > 20;
-    for (let j = 0; j < 6; j++) {
-      const jx = 310 + j * 26;
-      const jy = excited ? 188 + Math.round(Math.sin(Date.now() / 180 + j) * 3) : 190;
-      this.px(jx, jy, 10, 12, j % 2 === 0 ? '#4a3a8a' : '#2a4a6a');
-      this.px(jx + 2, jy - 5, 6, 6, '#e8c9a0');
-    }
-
-    if (S.court && S.court.mode !== 'duel') {
-      this.px(340, 145, 120, 80, PAL.woodDark);
-      this.px(342, 143, 116, 4, PAL.gold);
-    }
-
+    /* Speech bubble overlay */
     if (this.bubble && this.bubble.timer > 0) {
-      const bx = this.bubble.side === 'player' ? 210 : 530;
-      const by = 155;
-      ctx.fillStyle = 'rgba(255,255,255,0.92)';
-      ctx.strokeStyle = '#1a0a2a'; ctx.lineWidth = 2;
+      const bx = this.bubble.side === 'player' ? 185 : 545;
+      const by = 232;
+      ctx.fillStyle = 'rgba(255,255,240,0.94)';
+      ctx.strokeStyle = '#1a0a2a';
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.roundRect ? ctx.roundRect(bx, by, 110, 30, 6) : ctx.rect(bx, by, 110, 30);
+      if (ctx.roundRect) ctx.roundRect(bx, by, 110, 22, 3);
+      else ctx.rect(bx, by, 110, 22);
       ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#1a0a2a'; ctx.font = 'bold 10px monospace';
-      ctx.fillText(this.bubble.text.substring(0, 16), bx + 6, by + 18);
+      ctx.fillStyle = '#1a0a2a';
+      ctx.font = 'bold 9px Courier New';
+      ctx.textAlign = 'left';
+      ctx.fillText(this.bubble.text.substring(0, 17), bx + 4, by + 14);
       this.bubble.timer--;
     }
   };
@@ -3606,19 +3552,488 @@
     });
     function tick() {
       canvas.width = menu.offsetWidth; canvas.height = menu.offsetHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const ctx2 = canvas.getContext('2d');
+      ctx2.clearRect(0, 0, canvas.width, canvas.height);
       particles.forEach(function (p) {
         p.y -= p.vy; if (p.y < 0) p.y = 1;
-        ctx.globalAlpha = 0.3 + 0.5 * Math.abs(Math.sin(p.alpha + Date.now() / 1800));
-        ctx.fillStyle = '#d4a82c';
-        ctx.fillRect(Math.round(p.x * canvas.width), Math.round(p.y * canvas.height), p.size, p.size);
+        ctx2.globalAlpha = 0.3 + 0.5 * Math.abs(Math.sin(p.alpha + Date.now() / 1800));
+        ctx2.fillStyle = '#d4a82c';
+        ctx2.fillRect(Math.round(p.x * canvas.width), Math.round(p.y * canvas.height), p.size, p.size);
       });
-      ctx.globalAlpha = 1;
+      ctx2.globalAlpha = 1;
       requestAnimationFrame(tick);
     }
     tick();
   })();
 
-  console.log('[Visual Enhancements] courtroom canvas and homepage particles loaded.');
+  console.log('[Visual Enhancements] canvas wrapper + homepage particles loaded.');
+})();
+
+
+/* ============================================================
+ * GAME IMPROVEMENTS v4
+ * 1. Case-specific evidence descriptions
+ * 2. Case Dossier on prep screen
+ * 3. Investigation action choices
+ * 4. Closing argument minigame
+ * 5. Witness profile intel strip
+ * 6. Style bonuses across case phases
+ * 7. Better court action grouping
+ * ============================================================ */
+(function gameImprovements_v4() {
+  'use strict';
+  if (typeof Game === 'undefined' || typeof EVIDENCE === 'undefined') return;
+
+  /* ----------------------------------------------------------
+   * 1. CONTEXTUAL EVIDENCE DESCRIPTIONS
+   * ---------------------------------------------------------- */
+  const EV_CTX = {
+    email_thread:           function(c) { return c && c.opponent ? c.opponent.name + ' asks legal to conceal a key clause before signing — found in discovery.' : 'Email chain revealing damaging internal communications.'; },
+    phone_record:           function(c) { return c && c.witness  ? 'Three calls between ' + c.witness.name + ' and opposing counsel before testimony changed — timestamps logged.' : 'Call logs show undisclosed contact with key parties.'; },
+    internal_memo:          function(c) { return c && c.opponent ? 'Internal memo from ' + c.opponent.name + '\'s firm directly contradicts their filed position.' : 'Internal document showing deliberate concealment.'; },
+    timeline_contradiction: function(c) { return c && c.witness  ? c.witness.name + '\'s account places them elsewhere — the timeline is physically impossible.' : 'Timeline analysis reveals a factual impossibility in the testimony.'; },
+    financial_ledger:       function(c) { return c && c.opponent ? 'Payments from ' + c.opponent.name + '\'s accounts on the exact contested dates, cross-referenced with the ledger.' : 'Ledger entries directly contradict the financial claims.'; },
+    expert_report:          function()  { return 'Independent expert analysis contradicts the defense conclusions and cites specific technical failures.'; },
+    signed_contract:        function(c) { return c && c.opponent ? c.opponent.name + '\'s own signature commits to the disputed clause — no ambiguity remains.' : 'Original signed agreement establishing the obligation in writing.'; },
+    nda_clause:             function(c) { return c && c.opponent ? 'The NDA contains a carve-out that voids ' + c.opponent.name + '\'s central confidentiality argument.' : 'A specific NDA clause that entirely undermines the defense position.'; },
+    witness_statement:      function(c) { return c && c.witness  ? 'Earlier sworn statement by ' + c.witness.name + ' directly contradicts their testimony today, word for word.' : 'Prior sworn statement in direct conflict with current testimony.'; },
+    security_footage:       function(c) { return c && c.witness  ? 'Building footage timestamps place ' + c.witness.name + ' at the location they denied visiting.' : 'Security footage placing a key figure at the disputed location and time.'; },
+    board_minutes:          function(c) { return c && c.opponent ? 'Board meeting minutes record the decision ' + c.opponent.name + ' claims was never formally made.' : 'Official meeting record of a decision that was subsequently denied.'; },
+    redline_draft:          function()  { return 'Marked-up contract draft shows deliberate deletion of language that proves original intent.'; },
+    access_badge_log:       function(c) { return c && c.opponent ? 'Electronic badge records show access to ' + c.opponent.name + '\'s office on the exact disputed dates.' : 'Access log placing a key person at the scene on the relevant date.'; },
+    whistle_file:           function(c) { return c && c.opponent ? 'A whistleblower document details the scheme from inside ' + c.opponent.name + '\'s own organization.' : 'Insider disclosure document detailing the scheme step by step.'; },
+    calendar_invite:        function(c) { return c && c.opponent ? 'A calendar invite proves ' + c.opponent.name + ' attended the exact meeting they deny being in.' : 'Digital calendar proving attendance at the disputed meeting.'; },
+    settlement_draft:       function(c) { return c && c.opponent ? 'An earlier draft settlement offer reveals ' + c.opponent.name + ' privately acknowledged the claim was valid.' : 'Draft settlement showing the defendant knew the claim was credible.'; },
+  };
+  window._getCtxDesc = function(card, caseData) {
+    var fn = EV_CTX[card.id];
+    return fn ? fn(caseData) : (card.desc || '');
+  };
+
+  function applyCtxDescs(containerEl, handArr, caseData) {
+    if (!containerEl || !handArr || !caseData) return;
+    containerEl.querySelectorAll('.ev-card').forEach(function(el, i) {
+      var card = handArr[i];
+      if (!card) return;
+      var descEl = el.querySelector('.ev-desc');
+      if (descEl && !card._ctxApplied) {
+        descEl.textContent = window._getCtxDesc(card, caseData);
+        card._ctxApplied = true;
+      }
+    });
+  }
+
+  /* ----------------------------------------------------------
+   * 2. CASE DOSSIER
+   * ---------------------------------------------------------- */
+  function buildDossierHTML(cd, playerStyle) {
+    if (!cd) return '';
+    var risk     = cd.diff >= 4 ? '🔴 High' : cd.diff >= 2 ? '🟡 Moderate' : '🟢 Low';
+    var strats   = { closer: 'Build momentum and land a decisive Closing Argument. Accumulate jury points steadily.', shark: 'Pressure the witness hard — high risk but devastating if it lands. Watch the judge patience.', strategist: 'Investigate fully and expose contradictions methodically. Your hints are sharper than anyone\'s.', charmer: 'Work the jury and recover after hits. The witness will crack with enough patience and charm.' };
+    var strategy = strats[playerStyle] || 'Read the witness carefully and match your evidence to their weaknesses.';
+    var opp      = cd.opponent || {};
+    var wit      = cd.witness  || {};
+    var leads    = cd.statements.filter(function(s) { return s.hint; }).slice(0, 2).map(function(s) { return '• ' + s.hint; }).join('<br>');
+    var reward   = cd.reward ? '$' + cd.reward.money.toLocaleString() + ' + ' + cd.reward.rep + ' Rep' : 'Justice and compensation.';
+
+    return '<div class="dossier-panel" id="caseDossierPanel">' +
+      '<div class="dossier-header">' +
+        '<span class="dossier-badge">📋 CASE DOSSIER</span>' +
+        '<button class="ghost dossier-toggle-btn" id="dossierToggleBtn">▼ Hide</button>' +
+      '</div>' +
+      '<div class="dossier-body" id="dossierBody">' +
+        '<div class="dossier-grid">' +
+          '<div class="dossier-block"><span class="dossier-lbl">CASE</span><span class="dossier-val">' + cd.title + '</span></div>' +
+          '<div class="dossier-block"><span class="dossier-lbl">RISK</span><span class="dossier-val">' + risk + '</span></div>' +
+          '<div class="dossier-block dossier-wide"><span class="dossier-lbl">SUMMARY</span><span class="dossier-val">' + (cd.intro || '') + '</span></div>' +
+          '<div class="dossier-block"><span class="dossier-lbl">OPPONENT</span><span class="dossier-val">' + opp.name + '<br><em class="dossier-dim">' + opp.personality + '</em></span></div>' +
+          '<div class="dossier-block"><span class="dossier-lbl">KEY WITNESS</span><span class="dossier-val">' + wit.name + '<br><em class="dossier-dim">' + wit.role + '</em></span></div>' +
+          '<div class="dossier-block dossier-wide"><span class="dossier-lbl">STRATEGY (' + (playerStyle || '').toUpperCase() + ')</span><span class="dossier-val">' + strategy + '</span></div>' +
+          (leads ? '<div class="dossier-block dossier-wide"><span class="dossier-lbl">KNOWN LEADS</span><span class="dossier-val">' + leads + '</span></div>' : '') +
+          '<div class="dossier-block dossier-wide"><span class="dossier-lbl">CLIENT GOAL</span><span class="dossier-val">' + reward + '</span></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function injectDossier() {
+    var existing = document.getElementById('caseDossierPanel');
+    if (existing) existing.remove();
+    if (!S.caseData || !S.player) return;
+    var prepPool = UI.$('prepPool');
+    if (!prepPool || !prepPool.parentNode) return;
+    var div = document.createElement('div');
+    div.innerHTML = buildDossierHTML(S.caseData, S.player.style);
+    var panel = div.firstElementChild;
+    if (!panel) return;
+    prepPool.parentNode.insertBefore(panel, prepPool);
+    var btn  = document.getElementById('dossierToggleBtn');
+    var body = document.getElementById('dossierBody');
+    if (btn && body) {
+      btn.onclick = function() {
+        var hidden = body.style.display === 'none';
+        body.style.display = hidden ? '' : 'none';
+        btn.textContent = hidden ? '▼ Hide' : '▶ Show';
+      };
+    }
+  }
+
+  /* ----------------------------------------------------------
+   * 3. INVESTIGATION ACTION CHOICES
+   * ---------------------------------------------------------- */
+  var INVEST_ACTIONS = {
+    office:  [
+      { id: 'interview',    label: '👥 Interview Client',      desc: 'Reveal a witness statement weakness' },
+      { id: 'review_docs',  label: '📄 Review Case Files',     desc: '+Confidence; chance to surface a lead' },
+      { id: 'prep_theory',  label: '🧠 Build Case Theory',     desc: '+Logic; sharpen your case narrative' },
+    ],
+    corp: [
+      { id: 'pressure_asst', label: '🗣️ Pressure the Assistant', desc: 'High risk — weakness or opponent forewarned' },
+      { id: 'follow_money',  label: '💰 Follow the Money',        desc: 'Chase the financial trail for hard evidence' },
+      { id: 'read_opp',      label: '🔍 Study Opposing Counsel',  desc: '+Logic; learn their personality and tells' },
+    ],
+    records: [
+      { id: 'search_records',   label: '📜 Search Filed Records',    desc: 'Moderate chance — precedent or weakness' },
+      { id: 'analyze_docs',     label: '🔬 Analyze Documents',       desc: 'Reveal a contradiction in testimony' },
+      { id: 'recheck_timeline', label: '⏱️ Recheck Timeline',       desc: '+Legal Skill; find timeline inconsistencies' },
+    ],
+  };
+
+  function showInvestPicker(loc) {
+    var existing = document.getElementById('investActionPicker');
+    if (existing) existing.remove();
+    var actions = INVEST_ACTIONS[loc.id] || [{ id: 'search', label: '🔍 Investigate', desc: 'Standard investigation approach' }];
+    var picker = document.createElement('div');
+    picker.id = 'investActionPicker';
+    picker.className = 'invest-picker';
+    picker.innerHTML =
+      '<div class="invest-picker-title">📍 ' + loc.name + '</div>' +
+      '<div class="invest-picker-sub">' + loc.desc + ' — Choose your approach:</div>' +
+      '<div class="invest-picker-btns" id="ipBtns"></div>' +
+      '<button class="big invest-picker-cancel" id="ipCancel">← Back</button>';
+    var btnsDiv = picker.querySelector('#ipBtns');
+    actions.forEach(function(a) {
+      var b = document.createElement('button');
+      b.className = 'big invest-action-btn';
+      b.innerHTML = '<span class="ia-label">' + a.label + '</span><span class="ia-desc">' + a.desc + '</span>';
+      b.onclick = function() { picker.remove(); applyInvestAction(loc, a.id); };
+      btnsDiv.appendChild(b);
+    });
+    picker.querySelector('#ipCancel').onclick = function() { picker.remove(); };
+    var locList = UI.$('locList');
+    if (locList) locList.parentNode.insertBefore(picker, locList.nextSibling);
+  }
+
+  function applyInvestAction(loc, actionId) {
+    var c = S.caseData;
+    S.invest.visited[loc.id] = true;
+    S.invest.left--;
+    Snd.paper && Snd.paper();
+    var r = Math.random();
+    var clue = '';
+
+    function revealWeak() {
+      var unrev = c.statements.filter(function(_, i) { return !S.invest.revealed.includes(i); });
+      if (!unrev.length) return null;
+      var idx = c.statements.indexOf(unrev[Math.floor(Math.random() * unrev.length)]);
+      S.invest.revealed.push(idx);
+      return c.statements[idx].hint;
+    }
+
+    if (actionId === 'interview' || actionId === 'search_records') {
+      var h = revealWeak();
+      clue = h ? '📁 ' + loc.name + ': Critical lead — "' + h + '"' : '📁 ' + loc.name + ': Thorough prep. +1 Confidence.';
+      if (!h) S.player.stats.confidence = Math.min(10, S.player.stats.confidence + 1);
+    } else if (actionId === 'review_docs' || actionId === 'analyze_docs') {
+      if (r < 0.55) { var h2 = revealWeak(); clue = h2 ? '📄 ' + loc.name + ': Documents show — "' + h2 + '"' : '📄 ' + loc.name + ': Careful analysis. +1 Legal Skill.'; if (!h2) S.player.stats.legalSkill = Math.min(10, S.player.stats.legalSkill + 1); }
+      else { S.player.stats.legalSkill = Math.min(10, S.player.stats.legalSkill + 1); clue = '📄 ' + loc.name + ': Hours of careful work. +1 Legal Skill.'; }
+    } else if (actionId === 'prep_theory' || actionId === 'recheck_timeline') {
+      S.player.stats.logic = Math.min(10, S.player.stats.logic + 1);
+      var h3 = r < 0.45 ? revealWeak() : null;
+      clue = h3 ? '🧠 ' + loc.name + ': Theory spots a gap — "' + h3 + '"' : '🧠 ' + loc.name + ': Theory sharpened. +1 Logic.';
+    } else if (actionId === 'pressure_asst') {
+      if (r < 0.52) { var h4 = revealWeak(); clue = h4 ? '🗣️ ' + loc.name + ': They crack — "' + h4 + '"' : '🗣️ ' + loc.name + ': +1 Intimidation.'; if (!h4) S.player.stats.intimidation = Math.min(10, S.player.stats.intimidation + 1); }
+      else { S.invest.coldOpp = true; clue = '🗣️ ' + loc.name + ': They tipped off opposing counsel. ⚠️ Opponent forewarned.'; }
+    } else if (actionId === 'follow_money') {
+      if (r < 0.65) { var h5 = revealWeak(); clue = h5 ? '💰 ' + loc.name + ': Financial trail — "' + h5 + '"' : '💰 ' + loc.name + ': +1 Legal Skill.'; if (!h5) S.player.stats.legalSkill = Math.min(10, S.player.stats.legalSkill + 1); }
+      else { clue = '💰 ' + loc.name + ': Accounts obscured. Trail runs cold.'; }
+    } else if (actionId === 'read_opp') {
+      S.player.stats.logic = Math.min(10, S.player.stats.logic + 1);
+      clue = '🔍 ' + loc.name + ': Opposing counsel is "' + c.opponent.personality + '". Adapt your approach. +1 Logic.';
+    } else {
+      var h6 = revealWeak();
+      clue = h6 ? '🔍 ' + loc.name + ': — "' + h6 + '"' : '🔍 ' + loc.name + ': Investigation complete.';
+    }
+
+    S.invest.clues.push(clue);
+    if (Game.renderInvestigation) Game.renderInvestigation();
+  }
+
+  /* ----------------------------------------------------------
+   * 4. CLOSING ARGUMENT MINIGAME
+   * ---------------------------------------------------------- */
+  var CONTRADICTIONS = [
+    { id: 'timeline',   label: 'The timeline is physically impossible',           v: 9 },
+    { id: 'motive',     label: 'A hidden financial motive explains everything',    v: 7 },
+    { id: 'testimony',  label: 'Witness testimony is internally inconsistent',     v: 8 },
+    { id: 'physical',   label: 'Physical evidence contradicts the account',        v: 8 },
+    { id: 'prior_stmt', label: 'Prior sworn statement directly conflicts',         v: 10 },
+  ];
+  var THEORIES = [
+    { id: 'negligence',   label: 'Negligent disregard for a duty of care',         v: 6 },
+    { id: 'deception',    label: 'Deliberate concealment of material facts',        v: 9 },
+    { id: 'breach',       label: 'Clear and documented breach of agreed terms',     v: 8 },
+    { id: 'conspiracy',   label: 'Coordinated misrepresentation by multiple parties', v: 10 },
+    { id: 'incompetence', label: 'Professional incompetence directly caused harm',  v: 5 },
+  ];
+  var GOOD_PAIRS = { deception: ['prior_stmt', 'testimony'], conspiracy: ['timeline', 'prior_stmt'], breach: ['timeline', 'physical', 'motive'] };
+
+  function showClosingMinigame() {
+    var c = S.court;
+    if (!c || !S.caseData) { if (Game._origResolveClosing) Game._origResolveClosing(); return; }
+    var existing = document.getElementById('closingMinigame');
+    if (existing) existing.remove();
+    var overlay = document.createElement('div');
+    overlay.id = 'closingMinigame';
+    overlay.className = 'closing-mg-overlay';
+    var selEv = null, selContra = null, selTheory = null;
+
+    function render() {
+      var evOpts = (S.court.hand || []).map(function(card) {
+        return '<button class="closing-choice-btn' + (selEv === card.id ? ' selected' : '') + '" data-ev="' + card.id + '">' + card.name + (card.used ? ' ✓' : '') + '</button>';
+      }).join('');
+      var conOpts = CONTRADICTIONS.map(function(con) {
+        return '<button class="closing-choice-btn' + (selContra === con.id ? ' selected' : '') + '" data-con="' + con.id + '">' + con.label + '</button>';
+      }).join('');
+      var thOpts = THEORIES.map(function(th) {
+        return '<button class="closing-choice-btn' + (selTheory === th.id ? ' selected' : '') + '" data-th="' + th.id + '">' + th.label + '</button>';
+      }).join('');
+      var ready = selEv && selContra && selTheory;
+      overlay.innerHTML =
+        '<div class="closing-mg-card">' +
+          '<div class="closing-mg-title">⚖ CLOSING ARGUMENT</div>' +
+          '<p class="closing-mg-intro">Build your final case. Choose wisely — the jury is watching.</p>' +
+          '<div class="closing-section"><div class="closing-sec-lbl">1. Your strongest evidence:</div><div class="closing-choices">' + evOpts + '</div></div>' +
+          '<div class="closing-section"><div class="closing-sec-lbl">2. Key contradiction to highlight:</div><div class="closing-choices">' + conOpts + '</div></div>' +
+          '<div class="closing-section"><div class="closing-sec-lbl">3. Your theory of the case:</div><div class="closing-choices">' + thOpts + '</div></div>' +
+          '<div class="closing-mg-footer">' +
+            '<button class="big primary" id="closingDeliverBtn"' + (ready ? '' : ' disabled') + '>Deliver Closing →</button>' +
+            '<button class="big" id="closingCancelBtn">← Back</button>' +
+          '</div>' +
+        '</div>';
+      overlay.querySelectorAll('[data-ev]').forEach(function(b)  { b.onclick = function() { selEv     = b.dataset.ev;  render(); }; });
+      overlay.querySelectorAll('[data-con]').forEach(function(b) { b.onclick = function() { selContra  = b.dataset.con; render(); }; });
+      overlay.querySelectorAll('[data-th]').forEach(function(b)  { b.onclick = function() { selTheory  = b.dataset.th;  render(); }; });
+      var deliverBtn = overlay.querySelector('#closingDeliverBtn');
+      if (deliverBtn) deliverBtn.onclick = function() { overlay.remove(); deliverClosing(selEv, selContra, selTheory); };
+      overlay.querySelector('#closingCancelBtn').onclick = function() { overlay.remove(); };
+    }
+    render();
+    document.body.appendChild(overlay);
+  }
+
+  function deliverClosing(evId, contraId, theoryId) {
+    var c = S.court;
+    if (!c) return;
+    c.ended = true;
+    Snd.drama && Snd.drama(); Snd.gavel && Snd.gavel();
+    Canvas.flashIt && Canvas.flashIt(); Canvas.shakeIt && Canvas.shakeIt();
+    UI.bigCue && UI.bigCue('CLOSING ARGUMENT', 1200);
+
+    var bonus = 0, quality = 'standard';
+    // Reward picking evidence that matched a case weakness
+    if (S.caseData.statements.some(function(s) { return s.weakness === evId; })) { bonus += 18; quality = 'strong'; }
+    // Reward strong theory+contradiction pair
+    var goodPair = GOOD_PAIRS[theoryId];
+    if (goodPair && goodPair.includes(contraId)) { bonus += 12; quality = quality === 'strong' ? 'perfect' : 'strong'; }
+
+    var credDiff  = c.player.cred - c.opp.cred;
+    var closerB   = S.player && S.player.style === 'closer' ? 15 : (S.player && S.player.style === 'charmer' ? 8 : 0);
+    var closerExtra = (c._closerBonus || 0);
+    var stats     = S.player ? S.player.stats : { charm: 5, legalSkill: 5 };
+    var score     = credDiff + c.jury * 1.5 + closerB + closerExtra + bonus +
+                    (stats.charm + stats.legalSkill) * 1.2 +
+                    (c.focus || 0) * 0.25 + (c.combo || 0) * 5 + (c.statementsResolved || 0) * 4;
+
+    var qualMsgs  = { perfect: '💥 PERFECT ARGUMENT — the jury is yours.', strong: '✓ Strong closing — the evidence speaks clearly.', standard: 'Competent closing. The jury deliberates carefully.' };
+    var outcome   = score > 35 ? 'won' : score > 0 ? 'won' : score > -30 ? 'hung' : 'lost';
+    if (Game.courtLog) Game.courtLog(qualMsgs[quality] + ' Score: ' + Math.round(score) + '.', 'drama');
+    setTimeout(function() { Game.endCase && Game.endCase(outcome); }, 1500);
+  }
+
+  /* ----------------------------------------------------------
+   * 5. WITNESS PROFILE INTEL STRIP
+   * ---------------------------------------------------------- */
+  function updateWitnessStrip() {
+    var c  = S.court;
+    var cd = S.caseData;
+    if (!c || !cd || c.mode === 'duel') { var s = document.getElementById('witnessIntelStrip'); if (s) s.remove(); return; }
+    var conf = c.witnessConfidence;
+    var mood = conf > 80 ? 'Composed' : conf > 55 ? 'Uneasy' : conf > 30 ? 'Nervous' : '⚠ Cracking';
+    var approach = conf > 72 ? 'Cross-examine to drain confidence first'
+                 : conf > 40 ? 'Pin Down or match evidence for big impact'
+                 : 'Witness ready to break — expose or present now';
+    var weakTxt  = '';
+    var stmtIdx  = c.statementIdx || 0;
+    var stmt     = cd.statements[stmtIdx];
+    if ((c.revealedWeak || []).includes(stmtIdx) && stmt) {
+      weakTxt = '<span class="wit-intel-weak">⚡ Weakness: <b>' + stmt.hint + '</b></span>';
+    }
+    var strip = document.getElementById('witnessIntelStrip');
+    if (!strip) {
+      strip = document.createElement('div');
+      strip.id = 'witnessIntelStrip';
+      strip.className = 'witness-intel-strip';
+      var stmtBox = UI.$('statementBox');
+      if (stmtBox) stmtBox.parentNode.insertBefore(strip, stmtBox.nextSibling);
+    }
+    strip.innerHTML =
+      '<span class="wit-intel-item">Witness: <b>' + mood + '</b></span>' +
+      '<span class="wit-intel-item">Conf: <b>' + Math.round(conf) + '%</b></span>' +
+      '<span class="wit-intel-item wit-intel-tip">→ ' + approach + '</span>' +
+      weakTxt;
+  }
+
+  /* ----------------------------------------------------------
+   * 6. STYLE BONUSES ACROSS CASE PHASES
+   * ---------------------------------------------------------- */
+  var _origEnterCourtroom = Game.enterCourtroom && Game.enterCourtroom.bind(Game);
+  if (_origEnterCourtroom) {
+    Game.enterCourtroom = function() {
+      _origEnterCourtroom();
+      if (!S.court || !S.player) return;
+      var style = S.player.style;
+      if (style === 'strategist') {
+        S.court.focus = Math.min(100, (S.court.focus || 0) + 15);
+        if (S.caseData && S.court.revealedWeak && S.caseData.statements.length > 0 && !S.court.revealedWeak.includes(0)) S.court.revealedWeak.push(0);
+        if (Game.courtLog) Game.courtLog('STRATEGIST: Your prep pays off — first weakness revealed, +15 Focus.', 'drama');
+      } else if (style === 'shark') {
+        S.court.player.cred = Math.min(145, (S.court.player.cred || 100) + 8);
+        if (Game.courtLog) Game.courtLog('SHARK: Your reputation enters before you do. +8 Cred. The judge is watching.', 'drama');
+      } else if (style === 'charmer') {
+        S.court.jury  = Math.min(50,  (S.court.jury  || 0)   + 6);
+        S.court.judge = Math.min(100, (S.court.judge || 100) + 5);
+        if (Game.courtLog) Game.courtLog('CHARMER: Your presence immediately warms the room. Jury +6, Judge +5.', 'drama');
+      } else if (style === 'closer') {
+        S.court._closerBonus = 20;
+        if (Game.courtLog) Game.courtLog('CLOSER: You\'ve planned every word of your closing. Closing argument will hit harder.', 'drama');
+      }
+    };
+  }
+
+  /* ----------------------------------------------------------
+   * 7. ACTION GROUPING
+   * ---------------------------------------------------------- */
+  var TEXT_TO_ID = {
+    'Cross-Examine': 'cross', 'Pressure': 'pressure', 'Pin Down': 'pin', 'Read the Room': 'read',
+    'Expose Contradiction': 'expose', 'Dramatic Reveal': 'reveal', 'Consult Notes': 'consult',
+    'Object': 'object', 'Grandstand': 'grandstand', 'Calm Clarification': 'calm', 'Second Chair Save': 'secondchair',
+    'Recess': 'recess', 'Closing Argument': 'closing',
+  };
+  // Dynamic special button is labelled with style name, skip grouping those
+  var ACT_GROUPS = [
+    { label: '⚖ Questioning',   ids: ['cross', 'pressure', 'pin', 'read'] },
+    { label: '📂 Evidence',      ids: ['expose', 'reveal', 'consult'] },
+    { label: '🎭 Courtroom',     ids: ['object', 'grandstand', 'calm', 'secondchair'] },
+    { label: '⚡ Recovery',      ids: ['recess'] },
+    { label: '🏆 Finisher',      ids: ['closing'] },
+  ];
+
+  function applyGrouping(row) {
+    if (!row) return;
+    var btns = Array.from(row.querySelectorAll('button'));
+    if (btns.length < 5) return;
+    btns.forEach(function(b) {
+      var raw = b.textContent.split('(')[0].trim();
+      var id = TEXT_TO_ID[raw];
+      if (id) b.dataset.gid = id;
+    });
+    var frag = document.createDocumentFragment();
+    var placed = new Set();
+    ACT_GROUPS.forEach(function(grp) {
+      var grpBtns = btns.filter(function(b) { return grp.ids.includes(b.dataset.gid); });
+      if (!grpBtns.length) return;
+      var hdr = document.createElement('span');
+      hdr.className = 'act-group-lbl';
+      hdr.textContent = grp.label;
+      frag.appendChild(hdr);
+      grpBtns.forEach(function(b) { placed.add(b); frag.appendChild(b); });
+    });
+    btns.forEach(function(b) { if (!placed.has(b)) frag.appendChild(b); });
+    row.innerHTML = '';
+    row.appendChild(frag);
+  }
+
+  /* ----------------------------------------------------------
+   * HOOKS: Wire everything into existing render cycle
+   * ---------------------------------------------------------- */
+
+  /* Patch renderCourt */
+  var _origRC = Game.renderCourt && Game.renderCourt.bind(Game);
+  if (_origRC) {
+    Game.renderCourt = function() {
+      _origRC.apply(this, arguments);
+      // 1. Contextual descriptions on court hand
+      if (S.caseData && S.court) applyCtxDescs(UI.$('evidenceRow'), S.court.hand, S.caseData);
+      // 5. Witness intel strip
+      updateWitnessStrip();
+      // 7. Action grouping (campaign only to avoid breaking duel)
+      if (S.court && S.court.mode === 'campaign') applyGrouping(UI.$('courtActions'));
+    };
+  }
+
+  /* Patch renderPrepPool: inject dossier + contextual descriptions */
+  var _origRPP = Game.renderPrepPool && Game.renderPrepPool.bind(Game);
+  if (_origRPP) {
+    Game.renderPrepPool = function() {
+      _origRPP.apply(this, arguments);
+      injectDossier();
+      if (S.caseData && S.prep && S.prep.pool) {
+        var pool = UI.$('prepPool');
+        if (pool) {
+          pool.querySelectorAll('.ev-card').forEach(function(el, i) {
+            var id = S.prep.pool[i];
+            var ev = id && EVIDENCE[id];
+            if (!ev) return;
+            var descEl = el.querySelector('.ev-desc');
+            if (descEl) descEl.textContent = window._getCtxDesc(ev, S.caseData);
+          });
+        }
+      }
+    };
+  }
+
+  /* Patch renderInvestigation: rebind location clicks to show action picker */
+  var _origRI = Game.renderInvestigation && Game.renderInvestigation.bind(Game);
+  if (_origRI) {
+    Game.renderInvestigation = function() {
+      _origRI.apply(this, arguments);
+      var grid = UI.$('locList');
+      if (!grid || typeof LOCATIONS === 'undefined') return;
+      var locCards = Array.from(grid.querySelectorAll('.loc-card:not(.used)'));
+      locCards.forEach(function(card, i) {
+        var loc = LOCATIONS[i];
+        if (!loc || S.invest.visited[loc.id] || S.invest.left <= 0) return;
+        card.onclick = function() {
+          var ex = document.getElementById('investActionPicker');
+          if (ex) ex.remove();
+          showInvestPicker(loc);
+        };
+      });
+    };
+  }
+
+  /* Intercept closing action to show minigame */
+  var _origCourtAction = Game.courtAction && Game.courtAction.bind(Game);
+  if (_origCourtAction) {
+    Game.courtAction = function(id) {
+      if (id === 'closing' && S.court && S.court.closingAvailable && !S.court.ended) {
+        showClosingMinigame();
+        return;
+      }
+      _origCourtAction.apply(this, arguments);
+    };
+  }
+
+  console.log('[Game Improvements v4] Dossier, investigation choices, closing minigame, witness intel, style bonuses, action grouping loaded.');
 })();
