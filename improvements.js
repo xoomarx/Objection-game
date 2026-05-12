@@ -3985,7 +3985,10 @@
     var opp      = cd.opponent || {};
     var wit      = cd.witness  || {};
     var leads    = cd.statements.filter(function(s) { return s.hint; }).slice(0, 2).map(function(s) { return '• ' + s.hint; }).join('<br>');
-    var reward   = cd.reward ? '$' + cd.reward.money.toLocaleString() + ' + ' + cd.reward.rep + ' Rep' : 'Justice and compensation.';
+    var _rwd = cd.reward;
+    var _rwdMoney = _rwd && (typeof _rwd === 'object' ? (_rwd.money || 0) : _rwd);
+    var _rwdRep   = _rwd && typeof _rwd === 'object' ? (_rwd.reputation || _rwd.rep || 0) : 0;
+    var reward    = _rwdMoney ? '$' + Number(_rwdMoney).toLocaleString() + (_rwdRep ? ' + ' + _rwdRep + ' Rep' : '') : 'Justice and compensation.';
 
     return '<div class="dossier-panel" id="caseDossierPanel">' +
       '<div class="dossier-header">' +
@@ -4521,7 +4524,7 @@
     /* 1 — THE MISSING LEDGER */
     {
       title: 'The Missing Ledger',
-      intro: 'Your client, CFO Dana Reeves, is accused of destroying the company's financial records to conceal a $4M embezzlement. The prosecution's star witness: her own assistant.',
+      intro: "Your client, CFO Dana Reeves, is accused of destroying the company's financial records to conceal a $4M embezzlement. The prosecution's star witness: her own assistant.",
       category: 'financial',
       pattern: 'evidenceSuppression',
       diff: 2,
@@ -4553,10 +4556,10 @@
       statements: [
         { text: 'Our collection concept was finalized internally three months before Ms. Mura went public.', weakness: 'timeline_contradiction', obj: null, hint: 'Her sketchbook timestamps predate their internal deadline.', type: 'alibi' },
         { text: 'We have never had any contact with Ms. Mura or anyone in her studio.', weakness: 'email_thread', obj: 'hearsay', hint: 'An email chain references a private design summit where both parties attended.', type: 'partial_lie' },
-        { text: 'The similarities are coincidental — silhouette trends cycle naturally in fashion.', weakness: 'redline_draft', obj: 'speculation', hint: 'The redline draft contains a unique asymmetric pleat that appears verbatim in Darevka's show.', type: 'misleading' },
+        { text: 'The similarities are coincidental — silhouette trends cycle naturally in fashion.', weakness: 'redline_draft', obj: 'speculation', hint: "The redline draft contains a unique asymmetric pleat that appears verbatim in Darevka's show.", type: 'misleading' },
         { text: 'Our design process is entirely in-house and never relies on outside sources.', weakness: 'witness_statement', obj: null, hint: 'A freelance consultant who worked for Celeste also consulted for Darevka that season.', type: 'technical' },
         { text: 'Security footage shows no unauthorized access to our studio archive.', weakness: 'security_footage', obj: null, hint: 'The footage has a six-hour gap on the disputed night.', type: 'trap' },
-        { text: 'I designed every stitch of that collection myself — I am the sole creative mind here.', weakness: 'redline_draft', obj: null, hint: 'The redline shows a different designer's initials on the pivotal jacket sketch.', type: 'final_contradiction' }
+        { text: 'I designed every stitch of that collection myself — I am the sole creative mind here.', weakness: 'redline_draft', obj: null, hint: "The redline shows a different designer's initials on the pivotal jacket sketch.", type: 'final_contradiction' }
       ]
     },
 
@@ -4576,7 +4579,7 @@
         { text: 'He presented valid photo identification before I notarized the document.', weakness: 'security_footage', obj: null, hint: 'Office security footage shows a different build than Marsh.', type: 'fact' },
         { text: 'I have notarized hundreds of documents for this firm without incident.', weakness: 'witness_statement', obj: 'relevance', hint: 'A prior complaint about a notarized forgery was filed against her two years ago.', type: 'misleading' },
         { text: 'The signature is identical to samples I compared before notarizing.', weakness: 'signed_contract', obj: 'speculation', hint: 'A forensic handwriting expert finds three structural deviations.', type: 'technical' },
-        { text: 'Mr. Marsh called me the following day to confirm receipt — I recognize his voice.', weakness: 'phone_record', obj: 'hearsay', hint: 'Phone records show no call from Marsh's number that day.', type: 'trap' },
+        { text: 'Mr. Marsh called me the following day to confirm receipt — I recognize his voice.', weakness: 'phone_record', obj: 'hearsay', hint: "Phone records show no call from Marsh's number that day.", type: 'trap' },
         { text: 'I am absolutely certain it was him. I looked him in the eye.', weakness: 'timeline_contradiction', obj: null, hint: 'He was on a panel in Geneva at that exact hour — live-streamed.', type: 'final_contradiction' }
       ]
     },
@@ -4584,7 +4587,7 @@
     /* 4 — GALA AFTER DARK */
     {
       title: 'Gala After Dark',
-      intro: 'Socialite Vera Ashton claims philanthropist Edmund Frey made blackmail threats at a charity gala. Frey's camp says it never happened and is suing for defamation.',
+      intro: "Socialite Vera Ashton claims philanthropist Edmund Frey made blackmail threats at a charity gala. Frey's camp says it never happened and is suing for defamation.",
       category: 'defamation',
       pattern: 'emotionalAppeal',
       diff: 2,
@@ -4596,7 +4599,7 @@
         { text: 'I was stationed near the east wing all evening. Mr. Frey and Ms. Ashton never spoke alone.', weakness: 'security_footage', obj: null, hint: 'Footage shows both in the garden corridor — away from staff — for eleven minutes.', type: 'alibi' },
         { text: 'Ms. Ashton seemed perfectly at ease throughout the night. No distress at all.', weakness: 'witness_statement', obj: 'speculation', hint: 'Another guest recalls her visibly shaken just before midnight.', type: 'misleading' },
         { text: 'Mr. Frey is a trusted patron of this organization. He would never behave that way.', weakness: 'email_thread', obj: 'relevance', hint: 'An internal email shows the org received a prior complaint about Frey at a 2022 event.', type: 'emotional' },
-        { text: 'I reviewed the guest log and no private room was reserved or accessed that night.', weakness: 'security_footage', obj: null, hint: 'The garden corridor has no log — it's an open-air space not covered in the guest register.', type: 'technical' },
+        { text: 'I reviewed the guest log and no private room was reserved or accessed that night.', weakness: 'security_footage', obj: null, hint: "The garden corridor has no log — it's an open-air space not covered in the guest register.", type: 'technical' },
         { text: 'Ms. Ashton left the event early without saying goodbye to anyone — very odd behavior.', weakness: 'phone_record', obj: 'speculation', hint: 'Her phone shows a call to her attorney placed from the parking lot at 11:58 PM.', type: 'trap' },
         { text: 'There were always at least two staff members within earshot of both of them.', weakness: 'security_footage', obj: null, hint: 'The garden footage contradicts this — they were alone for over ten minutes.', type: 'final_contradiction' }
       ]
@@ -4605,7 +4608,7 @@
     /* 5 — SABOTAGE AT NEXCORE */
     {
       title: 'Sabotage at Nexcore',
-      intro: 'A deliberate malware deployment crippled Nexcore's server farm hours before their IPO. Your client, IT director Kenji Hara, is charged with corporate sabotage.',
+      intro: "A deliberate malware deployment crippled Nexcore's server farm hours before their IPO. Your client, IT director Kenji Hara, is charged with corporate sabotage.",
       category: 'cyber',
       pattern: 'proceduralBattle',
       diff: 3,
@@ -4637,7 +4640,7 @@
       statements: [
         { text: 'The origin point of the fire was inconsistent with an accidental electrical fault.', weakness: 'expert_report', obj: 'speculation', hint: 'A second independent report finds the wiring in that room was badly degraded.', type: 'technical' },
         { text: 'Mr. Doyle increased his policy coverage to maximum just forty days prior.', weakness: 'timeline_contradiction', obj: 'relevance', hint: 'His mortgage lender required him to raise coverage as a loan condition.', type: 'misleading' },
-        { text: 'Accelerant traces were found at two separate points — fire doesn't just travel that way.', weakness: 'witness_statement', obj: null, hint: 'A neighbor confirms cleaning solvents were stored in both locations.', type: 'fact' },
+        { text: "Accelerant traces were found at two separate points — fire doesn't just travel that way.", weakness: 'witness_statement', obj: null, hint: 'A neighbor confirms cleaning solvents were stored in both locations.', type: 'fact' },
         { text: 'He stood to gain nearly a million dollars from this claim.', weakness: 'financial_ledger', obj: 'relevance', hint: 'The ledger shows the rebuild cost estimate actually exceeds the payout.', type: 'emotional' },
         { text: 'He was unreachable for three hours before the fire was reported — no alibi.', weakness: 'phone_record', obj: null, hint: 'Phone records show he was on a call with his daughter for 90 minutes of that window.', type: 'trap' },
         { text: 'In twenty years I have never seen an accidental fire with this pattern. Never.', weakness: 'expert_report', obj: 'speculation', hint: 'The defense expert presents three documented cases with nearly identical patterns ruled accidental.', type: 'final_contradiction' }
@@ -4657,10 +4660,10 @@
       evidencePool: ['witness_statement','signed_contract','internal_memo','email_thread','phone_record','calendar_invite'],
       statements: [
         { text: 'Mr. Holloway had moderate cognitive impairment. He was not of full testamentary capacity.', weakness: 'signed_contract', obj: 'speculation', hint: 'The will itself includes a capacity assessment signed by two witnesses that same morning.', type: 'technical' },
-        { text: 'Nurse Stanton was alone with him for extended periods, contrary to protocol.', weakness: 'internal_memo', obj: null, hint: 'The care home's own duty roster shows her standard supervised rotations.', type: 'misleading' },
+        { text: 'Nurse Stanton was alone with him for extended periods, contrary to protocol.', weakness: 'internal_memo', obj: null, hint: "The care home's own duty roster shows her standard supervised rotations.", type: 'misleading' },
         { text: 'He never mentioned changing his will in any of our prior conversations.', weakness: 'email_thread', obj: 'hearsay', hint: 'An email from Holloway to his attorney three weeks prior explicitly mentions updating his estate plan.', type: 'partial_lie' },
         { text: 'The signature on the amended will shows tremor inconsistent with his normal hand.', weakness: 'witness_statement', obj: 'speculation', hint: 'A handwriting expert testifies that tremor variation is normal in late-stage illness and matches his other documents.', type: 'technical' },
-        { text: 'She was the sole beneficiary added in the amendment — that's a clear red flag.', weakness: 'signed_contract', obj: 'relevance', hint: 'The amendment also removed a prior beneficiary who had been estranged for a decade.', type: 'emotional' },
+        { text: "She was the sole beneficiary added in the amendment — that's a clear red flag.", weakness: 'signed_contract', obj: 'relevance', hint: 'The amendment also removed a prior beneficiary who had been estranged for a decade.', type: 'emotional' },
         { text: 'In my medical opinion, he could not have made that decision independently.', weakness: 'calendar_invite', obj: 'speculation', hint: 'His own attorney noted he was "sharp and deliberate" at their final meeting — the same afternoon.', type: 'final_contradiction' }
       ]
     },
@@ -4679,7 +4682,7 @@
       statements: [
         { text: 'The alarm was disabled from inside using an override code only Ms. Feld possessed.', weakness: 'access_badge_log', obj: null, hint: 'Badge records show the alarm tech who serviced the system also knew the code.', type: 'technical' },
         { text: 'Security footage shows a deliberate blind spot left uncovered during the gala.', weakness: 'security_footage', obj: 'speculation', hint: 'The camera positioning was unchanged from the previous six events.', type: 'misleading' },
-        { text: 'She had heavily insured the collection just weeks before — classic pre-theft behavior.', weakness: 'financial_ledger', obj: 'relevance', hint: 'The gallery's insurers required updated coverage as a renewal condition.', type: 'emotional' },
+        { text: 'She had heavily insured the collection just weeks before — classic pre-theft behavior.', weakness: 'financial_ledger', obj: 'relevance', hint: "The gallery's insurers required updated coverage as a renewal condition.", type: 'emotional' },
         { text: 'A delivery van parked outside for forty minutes during the gala was never identified.', weakness: 'expert_report', obj: 'hearsay', hint: 'Neighboring business CCTV shows it belonged to a catering supplier with a documented booking.', type: 'trap' },
         { text: 'Ms. Feld was unusually calm when she reported the theft the next morning.', weakness: 'witness_statement', obj: 'speculation', hint: 'Her assistant confirms she broke down immediately after calling police and had to be sedated.', type: 'misleading' },
         { text: 'I have secured dozens of high-value collections. This theft required inside knowledge. Absolute certainty.', weakness: 'security_footage', obj: 'speculation', hint: 'The footage shows the thieves spent nine minutes fumbling with the wrong cabinet before finding the right one — not inside knowledge.', type: 'final_contradiction' }
@@ -4689,7 +4692,7 @@
     /* 9 — THE CRESTFALL NDA */
     {
       title: 'The Crestfall NDA',
-      intro: 'Whistleblower Anya Sorel spoke to the press about safety violations at Crestfall Pharma. The company is suing for breach of her NDA. You're defending the right to speak.',
+      intro: "Whistleblower Anya Sorel spoke to the press about safety violations at Crestfall Pharma. The company is suing for breach of her NDA. You're defending the right to speak.",
       category: 'whistleblower',
       pattern: 'mediaTrial',
       diff: 3,
@@ -4761,12 +4764,12 @@
       witness: { name: 'Oliver Nash', role: 'Plaintiff / Former Partner' },
       evidencePool: ['signed_contract','board_minutes','email_thread','financial_ledger','redline_draft','nda_clause'],
       statements: [
-        { text: 'I never solicited clients away from the firm while still a partner. That would be a clear breach.', weakness: 'email_thread', obj: null, hint: 'An email thread shows him cc'd on pitches sent from a new LLC registered in his wife's name.', type: 'partial_lie' },
+        { text: 'I never solicited clients away from the firm while still a partner. That would be a clear breach.', weakness: 'email_thread', obj: null, hint: "An email thread shows him cc'd on pitches sent from a new LLC registered in his wife's name.", type: 'partial_lie' },
         { text: 'The partnership agreement grants me guaranteed equity regardless of removal circumstances.', weakness: 'signed_contract', obj: null, hint: 'The agreement contains a misconduct forfeiture clause — and the redline shows Nash himself drafted it.', type: 'fact' },
         { text: 'Grace never raised any concerns about my conduct at any board meeting.', weakness: 'board_minutes', obj: null, hint: 'Minutes from the March session document her formal objection to his billing practices.', type: 'misleading' },
         { text: 'The financial discrepancies are accounting errors — not intentional misappropriation.', weakness: 'financial_ledger', obj: 'speculation', hint: 'The ledger shows the same line item redirected to his personal account across eleven consecutive months.', type: 'technical' },
         { text: 'My NDA prevents me from disclosing the real reason I was pushed out — it would destroy this firm.', weakness: 'nda_clause', obj: 'relevance', hint: 'The NDA was signed after the dissolution — it cannot retroactively cover the misconduct at issue.', type: 'trap' },
-        { text: 'I built this firm from nothing. Everything that office is worth — that is my legacy.', weakness: 'redline_draft', obj: 'relevance', hint: 'The founding documents show the firm's core client base came entirely from Ellery's prior relationships.', type: 'final_contradiction' }
+        { text: 'I built this firm from nothing. Everything that office is worth — that is my legacy.', weakness: 'redline_draft', obj: 'relevance', hint: "The founding documents show the firm's core client base came entirely from Ellery's prior relationships.", type: 'final_contradiction' }
       ]
     }
 
@@ -4932,8 +4935,8 @@
 
   /* ── Dialogue pools per case category ── */
   var DIALOGUE_POOLS = {
-    financial:    ['Follow the money, counsel.', 'Numbers don't lie. Witnesses do.', 'The ledger never forgets.'],
-    cyber:        ['The digital trail is immutable.', 'Logs timestamp every action.', 'You can't undelete intent.'],
+    financial:    ['Follow the money, counsel.', "Numbers don't lie. Witnesses do.", 'The ledger never forgets.'],
+    cyber:        ['The digital trail is immutable.', 'Logs timestamp every action.', "You can't undelete intent."],
     theft:        ['Possession is not proof. Presence is.', 'What motive explains the timeline?', 'Opportunity without proof is suspicion.'],
     fraud:        ['Every forgery leaves a seam.', 'The truth is always in the details.', 'Signatures carry the weight of identity.'],
     defamation:   ['Words have consequences, Counsel.', 'Context is everything in a claim.', 'Reputation, once damaged, is hard to restore.'],
@@ -5232,7 +5235,7 @@
       'The gallery stirs. The prosecution\'s narrative just fractured.',
       'The witness stares at the exhibit. There is no good answer.',
       'Perfect match. The evidence does the talking — and it\'s devastating.',
-      '"I... that's..." The witness trails off. Exactly where you want them.',
+      '"I... that\'s..." The witness trails off. Exactly where you want them.',
       'That piece of evidence just closed a door the prosecution needed open.',
     ],
     evidenceMiss: [
