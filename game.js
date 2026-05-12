@@ -2372,16 +2372,22 @@ const Game = {
     const p1Style = STYLES[S.duelSel.p1];
     const p2Style = STYLES[S.duelSel.p2];
 
-    // Deal random evidence
-    const pool = Object.keys(EVIDENCE);
+    // Pick a random case — both players fight over the same witness
+    const caseIdx = Math.floor(Math.random() * CASES.length);
+    S.caseData = CASES[caseIdx];
+    const c = S.caseData;
+    S.player = null;
+
+    // Build hands from the case evidence pool
     const dealHand = () => {
-      const shuffled = pool.slice().sort(()=>Math.random()-0.5);
-      return shuffled.slice(0, 5).map(id => ({ id, ...EVIDENCE[id], used: false }));
+      const shuffled = c.evidencePool.slice().sort(() => Math.random() - 0.5);
+      return shuffled.slice(0, Math.min(5, shuffled.length)).map(id => ({ id, ...EVIDENCE[id], used: false }));
     };
 
-    // Duel doesn't use case statements; instead each player attacks the other directly
-    S.player = null; // duel doesn't use campaign player
-    S.caseData = null;
+    // Pre-investigation: 2 random statement hints revealed before court starts
+    const stmtCount = c.statements.length;
+    const hints = Array.from({length: stmtCount}, (_, i) => i).sort(() => Math.random() - 0.5);
+    const revealedWeak = hints.slice(0, Math.min(2, stmtCount));
 
     Snd.stopMurmur();
     Snd.gavel();
@@ -2399,8 +2405,13 @@ const Game = {
         cred: 100, hand: dealHand(), specialUses: p2Style.special.uses,
       },
       jury: 0, judge: 100, witnessConfidence: 100,
-      round: 1, maxRounds: 24,
+      round: 1, maxRounds: 20 + c.statements.length * 3,
       recess: { 1: 2, 2: 2 },
+      stmtIdx: 0,
+      stmtsResolved: 0,
+      revealedWeak,
+      p1Resolved: 0,
+      p2Resolved: 0,
     };
 
     // For canvas rendering we reuse S.court structure
@@ -2413,7 +2424,7 @@ const Game = {
       lastResult: null, lastSide: null,
     };
 
-    UI.$('caseLabel').textContent = 'Duel Mode';
+    UI.$('caseLabel').textContent = `Duel: ${c.title}`;
     UI.$('playerLabel').textContent = `${p1Name} vs ${p2Name}`;
     UI.$('moneyLabel').textContent = '—';
     UI.$('repLabel').textContent = '—';
@@ -2452,15 +2463,35 @@ const Game = {
     if (UI.$('numFocus')) {
       UI.$('barFocus').style.width = '0%';
       UI.$('numFocus').textContent = '—';
-      UI.$('comboBadge').textContent = 'Hot-seat Duel';
-      UI.$('trapBadge').textContent = 'No AI Trap';
+      const resolved = d.stmtsResolved;
+      const total = S.caseData ? S.caseData.statements.length : '?';
+      UI.$('comboBadge').textContent = `Statements ${resolved}/${total} resolved`;
+      UI.$('trapBadge').textContent = `${cur.name}'s turn`;
       UI.$('trapBadge').className = 'badge';
-      UI.$('tacticTip').textContent = 'Duel mode is direct courtroom combat. Use evidence and specials to break the other lawyer before the clock ends.';
+      const stmtLeft = S.caseData ? S.caseData.statements.length - d.stmtIdx : 0;
+      UI.$('tacticTip').textContent = stmtLeft > 0
+        ? `Present evidence matching the statement weakness for a big hit. Cross-examine to reveal hints. ${stmtLeft} statement(s) remaining.`
+        : 'All statements examined. Deliver your closing argument.';
     }
 
-    UI.$('whoTalking').textContent = `${cur.name}'s Turn:`;
-    UI.$('statementText').textContent = `"Choose your move. The court is watching."`;
-    UI.$('hintLine').classList.add('hidden');
+    const stmt = S.caseData && d.stmtIdx < S.caseData.statements.length ? S.caseData.statements[d.stmtIdx] : null;
+    if (stmt) {
+      UI.$('whoTalking').textContent = `${S.caseData.witness.name} (${S.caseData.witness.role}):`;
+      UI.$('statementText').textContent = `"${stmt.text}"`;
+      const hintEl = UI.$('hintLine');
+      if (d.revealedWeak.includes(d.stmtIdx) || d.witnessConfidence < 35) {
+        hintEl.classList.remove('hidden');
+        hintEl.textContent = '⚡ Insight: ' + stmt.hint;
+      } else {
+        hintEl.classList.add('hidden');
+      }
+    } else {
+      UI.$('whoTalking').textContent = `${cur.name}'s Turn:`;
+      UI.$('statementText').textContent = d.stmtIdx >= (S.caseData ? S.caseData.statements.length : 0)
+        ? '"All statements have been examined. Deliver your closing argument."'
+        : '"Choose your move. The court is watching."';
+      UI.$('hintLine').classList.add('hidden');
+    }
 
     // Actions
     const row = UI.$('courtActions');
@@ -2473,7 +2504,7 @@ const Game = {
       { id:'duel_calm', label:'Defend: Composure', enabled: true },
       { id:'duel_recess', label:`Recess (${d.recess[d.turn]})`, enabled: d.recess[d.turn] > 0 },
       { id:'duel_special', label:`${sp.special.name} (${cur.specialUses})`, enabled: cur.specialUses > 0 },
-      { id:'duel_closing', label:'Closing (Finisher)', enabled: oth.cred < 60 || d.jury > 12 },
+      { id:'duel_closing', label:'Closing (Finisher)', enabled: oth.cred < 60 || d.jury > 12 || (S.caseData && d.stmtIdx >= S.caseData.statements.length) },
     ];
     acts.forEach(a => {
       const b = document.createElement('button');
@@ -2488,9 +2519,12 @@ const Game = {
     // Hand
     const hand = UI.$('evidenceRow');
     hand.innerHTML = '';
+    const curStmt = S.caseData && d.stmtIdx < S.caseData.statements.length ? S.caseData.statements[d.stmtIdx] : null;
     cur.hand.forEach((card, i) => {
+      const isMatch = !card.used && curStmt && card.id === curStmt.weakness && d.revealedWeak.includes(d.stmtIdx);
       const el = document.createElement('div');
-      el.className = 'ev-card' + (card.used ? ' used' : '');
+      el.className = 'ev-card' + (card.used ? ' used' : '') + (isMatch ? ' match-hint' : '');
+      if (isMatch) el.title = '⚡ This evidence matches the current testimony!';
       el.innerHTML = `
         <div class="ev-name">${card.name}</div>
         <div class="ev-desc">${card.desc}</div>
@@ -2515,32 +2549,40 @@ const Game = {
     switch(id) {
       case 'duel_obj': {
         Snd.objection(); Canvas.shakeIt();
-        const success = Math.random() < 0.6;
+        const objStmt = S.caseData && d.stmtIdx < S.caseData.statements.length ? S.caseData.statements[d.stmtIdx] : null;
+        const validObj = objStmt && objStmt.obj;
+        const success = Math.random() < (validObj ? 0.72 : 0.45);
         UI.bigCue('OBJECTION!', 600);
         if (success) {
-          const hit = 8 + Math.round(Math.random()*6);
+          const hit = 8 + Math.round(Math.random() * 6) + (validObj ? 4 : 0);
           oth.cred = Math.max(0, oth.cred - hit);
-          d.jury += (d.turn === 1 ? 4 : -4);
-          d.jury = Math.max(-50, Math.min(50, d.jury));
+          d.jury = Math.max(-50, Math.min(50, d.jury + (d.turn === 1 ? 4 : -4)));
           Canvas.addFloater(`-${hit}`, d.turn === 1 ? 590 : 230, 240, '#d44a3a');
-          this.duelLog(`${cur.name}: Sustained! ${oth.name} -${hit} cred.`, 'good');
-          S.court.lastResult='good'; S.court.lastSide = d.turn===1?'player':'opp';
+          const objLabel = validObj ? ` (valid ${objStmt.obj} objection!)` : '';
+          this.duelLog(`${cur.name}: Sustained!${objLabel} ${oth.name} -${hit} cred.`, 'good');
+          S.court.lastResult = 'good'; S.court.lastSide = d.turn === 1 ? 'player' : 'opp';
         } else {
           cur.cred = Math.max(0, cur.cred - 6);
           d.judge = Math.max(0, d.judge - 8);
           this.duelLog(`${cur.name}: Overruled. -6 cred, judge -8.`, 'bad');
-          S.court.lastResult='bad'; S.court.lastSide = d.turn===1?'player':'opp';
+          S.court.lastResult = 'bad'; S.court.lastSide = d.turn === 1 ? 'player' : 'opp';
         }
         break;
       }
       case 'duel_cross': {
         const logic = sp.stats.logic;
-        const hit = 6 + Math.round(Math.random() * 6) + Math.round(logic*0.4);
+        const hit = 6 + Math.round(Math.random() * 6) + Math.round(logic * 0.4);
         oth.cred = Math.max(0, oth.cred - hit);
-        d.witnessConfidence = Math.max(0, d.witnessConfidence - 5);
+        d.witnessConfidence = Math.max(0, d.witnessConfidence - 10);
         Canvas.addFloater(`-${hit}`, d.turn === 1 ? 590 : 230, 240, '#d44a3a');
-        this.duelLog(`${cur.name}: Sharp argument. ${oth.name} -${hit} cred.`, 'good');
-        S.court.lastResult='good'; S.court.lastSide = d.turn===1?'player':'opp';
+        // Reveal hint for current statement when witness confidence drops low enough
+        let hintMsg = '';
+        if (d.witnessConfidence < 60 && !d.revealedWeak.includes(d.stmtIdx)) {
+          d.revealedWeak.push(d.stmtIdx);
+          hintMsg = ' ⚡ Insight revealed for this statement!';
+        }
+        this.duelLog(`${cur.name}: Sharp cross-examination. ${oth.name} -${hit} cred.${hintMsg}`, 'good');
+        S.court.lastResult = 'good'; S.court.lastSide = d.turn === 1 ? 'player' : 'opp';
         break;
       }
       case 'duel_pressure': {
@@ -2598,9 +2640,9 @@ const Game = {
         } else if (cur.style === 'strategist') {
           const hit = 14;
           oth.cred = Math.max(0, oth.cred - hit);
-          d.jury += (d.turn === 1 ? 8 : -8);
-          d.jury = Math.max(-50, Math.min(50, d.jury));
-          this.duelLog(`${cur.name}: PAPER TRAIL. ${oth.name} -${hit}, jury bumped.`, 'drama');
+          d.jury = Math.max(-50, Math.min(50, d.jury + (d.turn === 1 ? 8 : -8)));
+          if (!d.revealedWeak.includes(d.stmtIdx)) d.revealedWeak.push(d.stmtIdx);
+          this.duelLog(`${cur.name}: PAPER TRAIL. ${oth.name} -${hit}, jury bumped. ⚡ Statement insight revealed!`, 'drama');
         } else if (cur.style === 'charmer') {
           d.jury += (d.turn === 1 ? 12 : -12);
           d.jury = Math.max(-50, Math.min(50, d.jury));
@@ -2668,38 +2710,60 @@ const Game = {
     if (card.used) return;
     card.used = true;
     Snd.evidence();
-    Canvas.flashIt();
-    // Duel evidence is straight damage: strength minus a risk roll
-    const roll = Math.random();
-    const goodHit = roll > (card.risk * 0.12);
-    let hit;
-    if (goodHit) {
-      hit = 8 + card.strength + Math.round(Math.random()*4);
+
+    const stmt = S.caseData && d.stmtIdx < S.caseData.statements.length ? S.caseData.statements[d.stmtIdx] : null;
+
+    if (stmt && card.id === stmt.weakness) {
+      // Perfect match — big hit, statement broken, advance
+      Canvas.flashIt();
+      Snd.drama();
+      const hit = 15 + card.strength + Math.round(Math.random() * 4);
       oth.cred = Math.max(0, oth.cred - hit);
-      d.jury += (d.turn === 1 ? 5 : -5);
-      d.jury = Math.max(-50, Math.min(50, d.jury));
+      d.jury = Math.max(-50, Math.min(50, d.jury + (d.turn === 1 ? 8 : -8)));
+      d.witnessConfidence = Math.max(0, d.witnessConfidence - 18);
+      d.stmtIdx++;
+      d.stmtsResolved++;
+      if (d.turn === 1) d.p1Resolved++; else d.p2Resolved++;
       Canvas.addFloater(`-${hit}`, d.turn === 1 ? 590 : 230, 240, '#d44a3a');
-      this.duelLog(`${cur.name} presents ${card.name}! ${oth.name} -${hit} cred.`, 'good');
       Snd.juryGasp();
-      S.court.lastResult='good'; S.court.lastSide = d.turn===1?'player':'opp';
+      const remaining = S.caseData.statements.length - d.stmtIdx;
+      if (remaining > 0) {
+        this.duelLog(`${cur.name} presents ${card.name}! STATEMENT BROKEN. ${oth.name} -${hit} cred. [${d.stmtsResolved}/${S.caseData.statements.length} resolved]`, 'drama');
+      } else {
+        this.duelLog(`${cur.name} presents ${card.name}! FINAL STATEMENT BROKEN — witness collapses! ${oth.name} -${hit} cred.`, 'drama');
+      }
+      S.court.lastResult = 'good'; S.court.lastSide = d.turn === 1 ? 'player' : 'opp';
     } else {
-      hit = 6 + card.risk * 2;
-      cur.cred = Math.max(0, cur.cred - hit);
-      d.judge = Math.max(0, d.judge - 5);
-      this.duelLog(`${cur.name}'s ${card.name} is challenged successfully. -${hit} cred.`, 'bad');
-      S.court.lastResult='bad'; S.court.lastSide = d.turn===1?'player':'opp';
+      // Wrong evidence — glancing hit or backfire
+      Canvas.flashIt();
+      const roll = Math.random();
+      const goodHit = roll > (card.risk * 0.15);
+      if (goodHit) {
+        const hit = Math.max(1, Math.round(card.strength * 0.5 + Math.random() * 3));
+        oth.cred = Math.max(0, oth.cred - hit);
+        d.jury = Math.max(-50, Math.min(50, d.jury + (d.turn === 1 ? 3 : -3)));
+        Canvas.addFloater(`-${hit}`, d.turn === 1 ? 590 : 230, 240, '#d44a3a');
+        this.duelLog(`${cur.name} presents ${card.name}. Glancing blow. ${oth.name} -${hit} cred.`, 'good');
+        S.court.lastResult = 'good'; S.court.lastSide = d.turn === 1 ? 'player' : 'opp';
+      } else {
+        const hit = 5 + card.risk * 2;
+        cur.cred = Math.max(0, cur.cred - hit);
+        d.judge = Math.max(0, d.judge - 5);
+        this.duelLog(`${cur.name}'s ${card.name} is challenged. Backfires. -${hit} cred.`, 'bad');
+        S.court.lastResult = 'bad'; S.court.lastSide = d.turn === 1 ? 'player' : 'opp';
+      }
     }
 
     if (oth.cred <= 0) {
       d.ended = true;
       this.duelLog(`${oth.name} collapses. ${cur.name} WINS!`, 'drama');
-      setTimeout(()=> this.endDuel(cur.name), 800);
+      setTimeout(() => this.endDuel(cur.name), 800);
       return;
     }
     if (cur.cred <= 0) {
       d.ended = true;
       this.duelLog(`${cur.name} collapses. ${oth.name} WINS!`, 'drama');
-      setTimeout(()=> this.endDuel(oth.name), 800);
+      setTimeout(() => this.endDuel(oth.name), 800);
       return;
     }
     d.round++;
@@ -2708,7 +2772,7 @@ const Game = {
       const score = (d.p1.cred - d.p2.cred) + d.jury * 1.2;
       const winner = score > 12 ? d.p1.name : (score < -12 ? d.p2.name : 'hung');
       this.duelLog(`The judge ends the duel on the record.`, 'drama');
-      setTimeout(()=> this.endDuel(winner), 800);
+      setTimeout(() => this.endDuel(winner), 800);
       return;
     }
     d.turn = d.turn === 1 ? 2 : 1;
@@ -2721,6 +2785,9 @@ const Game = {
 
   endDuel(winnerName) {
     Snd.stopMurmur();
+    const d = S.duel;
+    const caseTitle = S.caseData ? S.caseData.title : 'Duel';
+    const total = S.caseData ? S.caseData.statements.length : '?';
     if (winnerName === 'hung') {
       Snd.loss();
       UI.$('verdictTitle').textContent = 'HUNG JURY';
@@ -2732,7 +2799,12 @@ const Game = {
       UI.$('verdictArt').textContent = '⚖️ ★';
       UI.$('verdictText').textContent = `${winnerName} walks out of court vindicated. A masterclass in courtroom combat.`;
     }
-    UI.$('rewardBox').innerHTML = `<div>Duel Mode — no campaign rewards.</div>`;
+    UI.$('rewardBox').innerHTML = `
+      <div style="margin-bottom:8px"><b>Case: ${caseTitle}</b></div>
+      <div>${d.p1.name}: ${d.p1Resolved} statement(s) broken &nbsp;|&nbsp; ${Math.round(d.p1.cred)} cred remaining</div>
+      <div>${d.p2.name}: ${d.p2Resolved} statement(s) broken &nbsp;|&nbsp; ${Math.round(d.p2.cred)} cred remaining</div>
+      <div style="margin-top:6px;color:var(--ink-dim)">${d.stmtsResolved}/${total} total statements resolved — Duel Mode</div>
+    `;
     UI.$('nextCaseBtn').textContent = 'Another Duel →';
     UI.$('nextCaseBtn').onclick = () => this.startDuelSetup();
     UI.switchTo('verdict');
