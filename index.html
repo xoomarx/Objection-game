@@ -326,6 +326,18 @@
     </div>
   </div>
 
+  <!-- Pass Controller Overlay — shown between duel turns so players can't see each other's hand -->
+  <div id="passControllerOverlay" class="pass-overlay hidden">
+    <div class="pass-card">
+      <div class="pass-gavel">⚖</div>
+      <div class="pass-stamp">PASS CONTROLLER</div>
+      <div class="pass-player" id="passPlayerName">Player</div>
+      <div class="pass-role" id="passRoleLabel">Defense</div>
+      <p class="pass-hint">Hand the device to your opponent, then let them click when ready.</p>
+      <button id="passReadyBtn" class="big primary">I'M READY — BEGIN MY TURN →</button>
+    </div>
+  </div>
+
   <!-- Cutscene Overlay -->
   <div id="cutsceneOverlay" class="cutscene-overlay hidden" aria-live="assertive">
     <div class="cutscene-inner">

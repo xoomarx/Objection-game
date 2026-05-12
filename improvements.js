@@ -2910,3 +2910,715 @@
 
   console.log('[Suits Improvements v3] loaded — Firebase online mode enabled; old PeerJS/WebRTC section removed.');
 })();
+
+
+/* ============================================================
+ * DUEL MODE OVERHAUL
+ * Replaces the abstract "attack each other" duel with a real
+ * case-based courtroom experience. Both players examine the
+ * same witness statements, present case evidence, and use
+ * the full set of court actions. A "Pass Controller" overlay
+ * prevents each player from seeing the other's hand.
+ * ============================================================ */
+(function duelModeOverhaul() {
+  if (typeof Game === 'undefined' || typeof CASES === 'undefined') return;
+
+  Game.startDuel = function () {
+    const p1Name = (document.getElementById('d1Name') && document.getElementById('d1Name').value.trim()) || 'P1';
+    const p2Name = (document.getElementById('d2Name') && document.getElementById('d2Name').value.trim()) || 'P2';
+    const p1StyleId = S.duelSel && S.duelSel.p1;
+    const p2StyleId = S.duelSel && S.duelSel.p2;
+    if (!p1StyleId || !p2StyleId) return;
+    const p1Style = STYLES[p1StyleId];
+    const p2Style = STYLES[p2StyleId];
+
+    const caseList = CASES.filter(function (c) { return c.statements && c.statements.length >= 3; });
+    const randCase = caseList[Math.floor(Math.random() * caseList.length)] || CASES[0];
+    S.caseData = randCase;
+
+    const pool = (randCase.evidencePool || []).slice().sort(function () { return Math.random() - 0.5; });
+    const HAND_SIZE = 4;
+    const makeHand = function (ids) {
+      return ids.map(function (id) {
+        return Object.assign({ id: id, used: false }, EVIDENCE[id] || { name: id, desc: '', strength: 5, risk: 2, cost: 1 });
+      });
+    };
+    const p1Hand = makeHand(pool.slice(0, Math.min(HAND_SIZE, pool.length)));
+    const p2Hand = makeHand(pool.length >= HAND_SIZE * 2
+      ? pool.slice(HAND_SIZE, HAND_SIZE * 2)
+      : pool.slice().sort(function () { return Math.random() - 0.5; }).slice(0, HAND_SIZE));
+
+    S.player = { name: p1Name, style: p1StyleId, stats: p1Style.stats, money: 0, reputation: 0, wins: 0, perks: [] };
+
+    Snd.stopMurmur && Snd.stopMurmur();
+    Snd.gavel && Snd.gavel();
+    Snd.murmur && Snd.murmur();
+
+    const p1Data = {
+      name: p1Name, style: p1StyleId, tieColor: p1Style.tieColor, hairColor: p1Style.hairColor,
+      cred: 100, hand: p1Hand, specialUses: p1Style.special.uses, stats: p1Style.stats,
+    };
+    const p2Data = {
+      name: p2Name, style: p2StyleId, tieColor: p2Style.tieColor, hairColor: p2Style.hairColor,
+      cred: 100, hand: p2Hand, specialUses: p2Style.special.uses, stats: p2Style.stats,
+    };
+
+    S.duel = {
+      active: true, turn: 1, ended: false,
+      p1: p1Data, p2: p2Data,
+      jury: 0, judge: 100, witnessConfidence: 100,
+      round: 1, maxRounds: 30,
+      recess: { 1: 2, 2: 2 },
+      focus: { 1: 25, 2: 25 },
+      combo: { 1: 0, 2: 0 },
+      statementIdx: 0, revealedWeak: [], statementsResolved: 0, lastSpokenStatement: -1,
+      lastResult: null, lastSide: null,
+    };
+
+    S.court = {
+      mode: 'duel', player: p1Data,
+      opp: { name: p2Name, tieColor: p2Style.tieColor, hairColor: p2Style.hairColor, personality: 'neutral' },
+      ended: false, witnessConfidence: 100, jury: 0, judge: 100,
+      lastResult: null, lastSide: null, statementIdx: 0,
+    };
+
+    UI.$('caseLabel').textContent = randCase.title;
+    UI.$('playerLabel').textContent = p1Name + ' vs ' + p2Name;
+    UI.$('moneyLabel').textContent = '⚖';
+    UI.show('topbar');
+    UI.switchTo('court');
+    UI.log('courtLog', 'CASE: ' + randCase.title + ' — ' + randCase.intro, 'drama');
+    UI.log('courtLog', p1Name + ' (Defense) vs ' + p2Name + ' (Prosecution). Present matching evidence against witness statements to win!', 'good');
+    this.renderDuelCourt();
+  };
+
+  Game.renderDuelCourt = function () {
+    const d = S.duel;
+    if (!d || d.ended) return;
+    const cur = d.turn === 1 ? d.p1 : d.p2;
+    const oth = d.turn === 1 ? d.p2 : d.p1;
+
+    S.player = { name: cur.name, style: cur.style, stats: cur.stats, money: 0, reputation: 0, wins: 0, perks: [] };
+    S.court.player = cur;
+    S.court.opp = { name: oth.name, tieColor: oth.tieColor, hairColor: oth.hairColor, personality: 'neutral' };
+    S.court.witnessConfidence = d.witnessConfidence;
+    S.court.jury = d.jury; S.court.judge = d.judge;
+    S.court.ended = false; S.court.lastResult = d.lastResult; S.court.lastSide = d.lastSide;
+    S.court.statementIdx = d.statementIdx;
+
+    UI.$('pName').textContent = cur.name + ' ◄ TURN';
+    UI.$('oppName').textContent = oth.name;
+    UI.$('barPlayer').style.width = Math.max(0, Math.min(100, cur.cred)) + '%';
+    UI.$('numPlayer').textContent = Math.round(cur.cred);
+    UI.$('barOpp').style.width = Math.max(0, Math.min(100, oth.cred)) + '%';
+    UI.$('numOpp').textContent = Math.round(oth.cred);
+    const juryPct = 50 + d.jury;
+    const jb = UI.$('barJury');
+    jb.style.left = juryPct + '%'; jb.style.width = '3px';
+    UI.$('numJury').textContent = (d.jury > 0 ? '+' : '') + d.jury;
+    UI.$('barJudge').style.width = Math.max(0, Math.min(100, d.judge)) + '%';
+    UI.$('numJudge').textContent = Math.round(d.judge);
+    UI.$('barWit').style.width = Math.max(0, Math.min(100, d.witnessConfidence)) + '%';
+    UI.$('numWit').textContent = Math.round(d.witnessConfidence);
+    if (UI.$('trialClock')) {
+      UI.$('trialClock').textContent = d.round + '/' + d.maxRounds;
+      UI.$('barClock').style.width = Math.max(0, Math.min(100, ((d.maxRounds - d.round + 1) / d.maxRounds) * 100)) + '%';
+    }
+    if (UI.$('numFocus')) {
+      const f = d.focus[d.turn];
+      UI.$('barFocus').style.width = Math.max(0, Math.min(100, f)) + '%';
+      UI.$('numFocus').textContent = Math.round(f);
+      UI.$('comboBadge').textContent = 'Combo x' + d.combo[d.turn] + ' — ' + (d.turn === 1 ? 'Defense' : 'Prosecution');
+      const jLead = d.jury > 3 ? d.p1.name + ' leads' : d.jury < -3 ? d.p2.name + ' leads' : 'Jury: Even';
+      UI.$('trapBadge').textContent = jLead;
+      UI.$('tacticTip').textContent = cur.name + '\'s turn. Match evidence to witness statements for devastating hits!';
+    }
+
+    const stmt = S.caseData && d.statementIdx < S.caseData.statements.length ? S.caseData.statements[d.statementIdx] : null;
+    if (stmt) {
+      UI.$('whoTalking').textContent = (S.caseData.witness ? S.caseData.witness.name + ' (' + S.caseData.witness.role + ')' : 'Witness') + ':';
+      UI.$('statementText').textContent = '"' + stmt.text + '"';
+      if (d.lastSpokenStatement !== d.statementIdx) {
+        d.lastSpokenStatement = d.statementIdx;
+        setTimeout(function () { Snd.witnessMumble && Snd.witnessMumble(); }, 220);
+      }
+      const hintEl = UI.$('hintLine');
+      if (d.revealedWeak.includes(d.statementIdx) || d.witnessConfidence < 35) {
+        hintEl.classList.remove('hidden');
+        hintEl.textContent = '⚡ Insight: ' + (stmt.hint || 'Find the weakness.');
+      } else {
+        hintEl.classList.add('hidden');
+      }
+    } else {
+      UI.$('whoTalking').textContent = 'The Court:';
+      UI.$('statementText').textContent = '"All statements examined. Deliver your closing argument."';
+      UI.$('hintLine').classList.add('hidden');
+    }
+
+    const stmtCount = S.caseData ? S.caseData.statements.length : 1;
+    const closingAvail = d.statementsResolved >= Math.ceil(stmtCount * 0.5) || oth.cred < 45 || d.round >= Math.max(8, d.maxRounds - 4);
+    const f = d.focus[d.turn];
+    const hasMatch = !!stmt && cur.hand.some(function (c) { return !c.used && c.id === stmt.weakness; });
+
+    const row = UI.$('courtActions');
+    row.innerHTML = '';
+    const pStyleDuel = STYLES[cur.style];
+    const self = this;
+    const acts = [
+      { id: 'd_object',   label: 'Object',                  enabled: !!stmt },
+      { id: 'd_cross',    label: 'Cross-Examine',           enabled: !!stmt && d.witnessConfidence > 0 },
+      { id: 'd_pressure', label: 'Pressure',                enabled: !!stmt && d.witnessConfidence > 0 },
+      { id: 'd_read',     label: 'Read the Room',           enabled: true },
+      { id: 'd_consult',  label: 'Consult Notes (10F)',     enabled: f >= 10 && cur.hand.some(function (c) { return !c.used; }) },
+      { id: 'd_pin',      label: 'Pin Down (15F)',          enabled: !!stmt && d.witnessConfidence <= 70 && f >= 15 },
+      { id: 'd_expose',   label: 'Expose (20F)',            enabled: !!stmt && d.revealedWeak.includes(d.statementIdx) && f >= 20 },
+      { id: 'd_reveal',   label: 'Dramatic Reveal (25F)',   enabled: hasMatch && f >= 25 },
+      { id: 'd_calm',     label: 'Calm Clarification',      enabled: true },
+      { id: 'd_recess',   label: 'Recess (' + d.recess[d.turn] + ')', enabled: d.recess[d.turn] > 0 },
+      { id: 'd_special',  label: pStyleDuel.special.name + ' (' + cur.specialUses + ')', enabled: cur.specialUses > 0 },
+      { id: 'd_closing',  label: 'Closing Argument',        enabled: closingAvail },
+    ];
+    acts.forEach(function (a) {
+      const b = document.createElement('button');
+      b.className = 'big';
+      b.textContent = a.label;
+      b.disabled = !a.enabled || d.ended;
+      b.onclick = function () { self.duelCourtAction(a.id); };
+      if (a.id === 'd_closing' && a.enabled) b.classList.add('primary');
+      row.appendChild(b);
+    });
+    UI.hide('objectionRow');
+    UI.show('courtActions');
+
+    const hand = UI.$('evidenceRow');
+    hand.innerHTML = '';
+    cur.hand.forEach(function (card, i) {
+      const el = document.createElement('div');
+      el.className = 'ev-card' + (card.used ? ' used' : '');
+      if (stmt && card.id === stmt.weakness && !card.used) el.classList.add('match-hint');
+      el.innerHTML = '<div class="ev-name">' + card.name + '</div>' +
+        '<div class="ev-desc">' + card.desc + '</div>' +
+        '<div class="ev-stats"><span>STR ' + card.strength + '</span><span>RISK ' + card.risk + '</span></div>';
+      if (!card.used && !d.ended) {
+        el.onclick = (function (idx) { return function () { self.duelCourtPresent(idx); }; })(i);
+      }
+      hand.appendChild(el);
+    });
+  };
+
+  Game.duelCourtAction = function (id) {
+    const d = S.duel;
+    if (!d || d.ended) return;
+    const cur = d.turn === 1 ? d.p1 : d.p2;
+    const oth = d.turn === 1 ? d.p2 : d.p1;
+    const jDir = d.turn === 1 ? 1 : -1;
+    const stmt = S.caseData && d.statementIdx < S.caseData.statements.length ? S.caseData.statements[d.statementIdx] : null;
+    let f = d.focus[d.turn];
+    const self = this;
+
+    const endTurn = function () {
+      d.round++;
+      if (oth.cred <= 0) { d.ended = true; self.duelLog(oth.name + ' collapses. ' + cur.name + ' WINS!', 'drama'); setTimeout(function () { self.endDuelMatch(cur.name); }, 800); return; }
+      if (cur.cred <= 0) { d.ended = true; self.duelLog(cur.name + ' collapses. ' + oth.name + ' WINS!', 'drama'); setTimeout(function () { self.endDuelMatch(oth.name); }, 800); return; }
+      if (d.judge <= 0) { d.ended = true; self.duelLog('Judge declares a mistrial.', 'drama'); setTimeout(function () { self.endDuelMatch('hung'); }, 800); return; }
+      if (d.round > d.maxRounds) {
+        d.ended = true;
+        const w = d.jury > 5 ? d.p1.name : d.jury < -5 ? d.p2.name : 'hung';
+        self.duelLog('Time runs out. Jury decides.', 'drama');
+        setTimeout(function () { self.endDuelMatch(w); }, 800);
+        return;
+      }
+      self.duelPassTurn();
+    };
+
+    switch (id) {
+      case 'd_object': {
+        const objRow = UI.$('objectionRow');
+        UI.hide('courtActions'); UI.show('objectionRow');
+        const handleObj = function (type) {
+          UI.hide('objectionRow'); UI.show('courtActions');
+          objRow.querySelectorAll('[data-obj]').forEach(function (b) { b.onclick = null; });
+          const correct = stmt && stmt.obj === type;
+          if (correct) {
+            Snd.objection && Snd.objection(); Canvas.flashIt && Canvas.flashIt();
+            UI.bigCue && UI.bigCue('OBJECTION!', 900);
+            const hit = 10 + Math.round(Math.random() * 8);
+            oth.cred = Math.max(0, oth.cred - hit);
+            d.jury = Math.max(-50, Math.min(50, d.jury + jDir * 6));
+            d.judge = Math.max(0, d.judge - 2);
+            d.combo[d.turn]++; d.focus[d.turn] = Math.min(100, f + 8);
+            Canvas.addFloater && Canvas.addFloater('-' + hit, d.turn === 1 ? 590 : 230, 180, '#d44a3a');
+            self.duelLog(cur.name + ': OBJECTION SUSTAINED! ' + oth.name + ' -' + hit + ' cred.', 'drama');
+            d.lastResult = 'good'; d.lastSide = d.turn === 1 ? 'player' : 'opp';
+          } else {
+            Snd.objectionFail && Snd.objectionFail();
+            const pen = 6; cur.cred = Math.max(0, cur.cred - pen);
+            d.judge = Math.max(0, d.judge - 8); d.combo[d.turn] = 0;
+            self.duelLog(cur.name + ': Objection OVERRULED. -' + pen + ' cred, judge -8.', 'bad');
+            d.lastResult = 'bad'; d.lastSide = d.turn === 1 ? 'player' : 'opp';
+          }
+          endTurn();
+        };
+        objRow.querySelectorAll('[data-obj]').forEach(function (b) { b.onclick = function () { handleObj(b.dataset.obj); }; });
+        const cancelBtn = objRow.querySelector('[data-act="cancel-obj"]');
+        if (cancelBtn) cancelBtn.onclick = function () { UI.hide('objectionRow'); UI.show('courtActions'); self.renderDuelCourt(); };
+        return;
+      }
+      case 'd_cross': {
+        if (!stmt) { endTurn(); break; }
+        Snd.paper && Snd.paper();
+        const stat = cur.stats ? (cur.stats.legalSkill + cur.stats.charm) / 2 : 6;
+        const hit = Math.round(8 + stat * 0.5 + Math.random() * 6);
+        d.witnessConfidence = Math.max(0, d.witnessConfidence - hit);
+        d.focus[d.turn] = Math.min(100, f + 5); d.combo[d.turn]++;
+        Canvas.addFloater && Canvas.addFloater('-' + hit + ' conf', d.turn === 1 ? 640 : 165, 200, '#9a5ad4');
+        this.duelLog(cur.name + ': Cross-examines! Witness confidence -' + hit + '.', 'good');
+        d.lastResult = 'good'; d.lastSide = d.turn === 1 ? 'player' : 'opp';
+        if (d.witnessConfidence <= 0) {
+          this.duelLog('Witness breaks! Statement exposed!', 'drama');
+          if (!d.revealedWeak.includes(d.statementIdx)) d.revealedWeak.push(d.statementIdx);
+          this.duelAdvanceStatement();
+        }
+        endTurn(); break;
+      }
+      case 'd_pressure': {
+        if (!stmt) { endTurn(); break; }
+        const pStat = cur.stats ? cur.stats.intimidation : 5;
+        if (Math.random() > 0.35 - pStat * 0.02) {
+          const hit = Math.round(10 + pStat * 0.8 + Math.random() * 6);
+          oth.cred = Math.max(0, oth.cred - hit);
+          d.jury = Math.max(-50, Math.min(50, d.jury + jDir * 4));
+          d.combo[d.turn]++;
+          Canvas.addFloater && Canvas.addFloater('-' + hit, d.turn === 1 ? 590 : 230, 200, '#d44a3a');
+          this.duelLog(cur.name + ': Pressure lands! ' + oth.name + ' -' + hit + '.', 'good');
+          d.lastResult = 'good'; d.lastSide = d.turn === 1 ? 'player' : 'opp';
+        } else {
+          const pen = 8; cur.cred = Math.max(0, cur.cred - pen); d.combo[d.turn] = 0;
+          this.duelLog(cur.name + ': Pressure BACKFIRES. -' + pen + ' cred.', 'bad');
+          d.lastResult = 'bad'; d.lastSide = d.turn === 1 ? 'player' : 'opp';
+        }
+        endTurn(); break;
+      }
+      case 'd_read': {
+        const gain = 6 + Math.round(Math.random() * 4);
+        d.focus[d.turn] = Math.min(100, f + gain);
+        if (stmt && !d.revealedWeak.includes(d.statementIdx)) {
+          d.revealedWeak.push(d.statementIdx);
+          this.duelLog(cur.name + ': Reads the room — weakness revealed! Focus +' + gain + '.', 'drama');
+          Canvas.addFloater && Canvas.addFloater('INSIGHT', d.turn === 1 ? 230 : 590, 180, '#d4a82c');
+        } else {
+          this.duelLog(cur.name + ': Steadies themselves. Focus +' + gain + '.', 'good');
+        }
+        d.lastResult = 'good'; d.lastSide = d.turn === 1 ? 'player' : 'opp';
+        endTurn(); break;
+      }
+      case 'd_consult': {
+        if (f < 10) { endTurn(); break; }
+        d.focus[d.turn] = f - 10;
+        if (stmt && !d.revealedWeak.includes(d.statementIdx)) d.revealedWeak.push(d.statementIdx);
+        const boost = 6; cur.cred = Math.min(130, cur.cred + boost);
+        Canvas.addFloater && Canvas.addFloater('+' + boost, d.turn === 1 ? 230 : 590, 180, '#5aaa4a');
+        this.duelLog(cur.name + ': Consults notes. +' + boost + ' cred, weakness revealed.', 'good');
+        d.lastResult = 'good'; d.lastSide = d.turn === 1 ? 'player' : 'opp';
+        endTurn(); break;
+      }
+      case 'd_pin': {
+        if (f < 15 || !stmt) { endTurn(); break; }
+        d.focus[d.turn] = f - 15;
+        const hitPin = Math.round(12 + Math.random() * 8);
+        d.witnessConfidence = Math.max(0, d.witnessConfidence - hitPin);
+        oth.cred = Math.max(0, oth.cred - 6);
+        Canvas.addFloater && Canvas.addFloater('PIN -' + hitPin, d.turn === 1 ? 640 : 165, 200, '#9a5ad4');
+        this.duelLog(cur.name + ': PINS DOWN the witness! Conf -' + hitPin + ', ' + oth.name + ' -6.', 'drama');
+        d.lastResult = 'good'; d.lastSide = d.turn === 1 ? 'player' : 'opp';
+        if (d.witnessConfidence <= 0) { this.duelLog('Witness collapses!', 'drama'); this.duelAdvanceStatement(); }
+        endTurn(); break;
+      }
+      case 'd_expose': {
+        if (f < 20 || !stmt) { endTurn(); break; }
+        d.focus[d.turn] = f - 20;
+        const hitEx = Math.round(14 + Math.random() * 10);
+        oth.cred = Math.max(0, oth.cred - hitEx);
+        d.jury = Math.max(-50, Math.min(50, d.jury + jDir * 8));
+        Canvas.addFloater && Canvas.addFloater('⚡ -' + hitEx, d.turn === 1 ? 590 : 230, 170, '#d4a82c');
+        Snd.drama && Snd.drama();
+        this.duelLog(cur.name + ': EXPOSES the contradiction! ' + oth.name + ' -' + hitEx + '. Jury shifts.', 'drama');
+        d.lastResult = 'good'; d.lastSide = d.turn === 1 ? 'player' : 'opp';
+        endTurn(); break;
+      }
+      case 'd_reveal': {
+        if (f < 25 || !stmt) { endTurn(); break; }
+        const matchCard = cur.hand.find(function (c) { return !c.used && c.id === stmt.weakness; });
+        if (!matchCard) { endTurn(); break; }
+        matchCard.used = true;
+        d.focus[d.turn] = f - 25;
+        Snd.evidence && Snd.evidence(); Snd.drama && Snd.drama(); Canvas.flashIt && Canvas.flashIt();
+        UI.bigCue && UI.bigCue('DRAMATIC REVEAL', 1200);
+        const hitRev = Math.round(22 + matchCard.strength * 1.5 + Math.random() * 10);
+        oth.cred = Math.max(0, oth.cred - hitRev);
+        d.jury = Math.max(-50, Math.min(50, d.jury + jDir * 15));
+        d.witnessConfidence = Math.max(0, d.witnessConfidence - 30);
+        Canvas.addFloater && Canvas.addFloater('💥 -' + hitRev, d.turn === 1 ? 590 : 230, 160, '#ffdc5c');
+        this.duelLog(cur.name + ': DRAMATIC REVEAL — ' + matchCard.name + '! ' + oth.name + ' -' + hitRev + '. Jury massively shifts!', 'drama');
+        d.lastResult = 'good'; d.lastSide = d.turn === 1 ? 'player' : 'opp';
+        d.statementsResolved++; this.duelAdvanceStatement();
+        endTurn(); break;
+      }
+      case 'd_calm': {
+        const cStat = cur.stats ? cur.stats.charm : 5;
+        const heal = Math.round(8 + cStat * 0.6 + Math.random() * 5);
+        cur.cred = Math.min(130, cur.cred + heal);
+        d.judge = Math.min(100, d.judge + 3);
+        Canvas.addFloater && Canvas.addFloater('+' + heal, d.turn === 1 ? 230 : 590, 200, '#5aaa4a');
+        this.duelLog(cur.name + ': Calm clarification. +' + heal + ' cred.', 'good');
+        d.lastResult = 'good'; d.lastSide = d.turn === 1 ? 'player' : 'opp';
+        endTurn(); break;
+      }
+      case 'd_recess': {
+        if (d.recess[d.turn] <= 0) { endTurn(); break; }
+        d.recess[d.turn]--;
+        cur.cred = Math.min(130, cur.cred + 14);
+        d.witnessConfidence = Math.min(100, d.witnessConfidence + 15);
+        d.judge = Math.min(100, d.judge + 5);
+        Snd.recess && Snd.recess();
+        this.duelLog(cur.name + ' calls recess. +14 cred. Witness recovers.', 'good');
+        endTurn(); break;
+      }
+      case 'd_special': {
+        if (cur.specialUses <= 0) { endTurn(); break; }
+        cur.specialUses--;
+        Snd.drama && Snd.drama(); Canvas.flashIt && Canvas.flashIt();
+        const spName = STYLES[cur.style].special.name;
+        UI.bigCue && UI.bigCue(spName.toUpperCase(), 900);
+        if (cur.style === 'closer') {
+          cur.cred = Math.min(130, cur.cred + 20);
+          d.jury = Math.max(-50, Math.min(50, d.jury + jDir * 8));
+          this.duelLog(cur.name + ': POWER SUIT! +20 cred, jury sways.', 'drama');
+        } else if (cur.style === 'shark') {
+          const hitSp = 24; oth.cred = Math.max(0, oth.cred - hitSp); cur.cred = Math.max(0, cur.cred - 4);
+          Canvas.addFloater && Canvas.addFloater('-' + hitSp, d.turn === 1 ? 590 : 230, 180, '#d44a3a');
+          this.duelLog(cur.name + ': CORPORATE PRESSURE! ' + oth.name + ' -' + hitSp + '.', 'drama');
+        } else if (cur.style === 'strategist') {
+          const hitSt = 15; oth.cred = Math.max(0, oth.cred - hitSt);
+          d.jury = Math.max(-50, Math.min(50, d.jury + jDir * 10));
+          if (stmt && !d.revealedWeak.includes(d.statementIdx)) d.revealedWeak.push(d.statementIdx);
+          Canvas.addFloater && Canvas.addFloater('-' + hitSt, d.turn === 1 ? 590 : 230, 180, '#d44a3a');
+          this.duelLog(cur.name + ': PAPER TRAIL! ' + oth.name + ' -' + hitSt + '. Weakness revealed. Jury sways.', 'drama');
+        } else if (cur.style === 'charmer') {
+          d.jury = Math.max(-50, Math.min(50, d.jury + jDir * 18));
+          d.witnessConfidence = Math.max(0, d.witnessConfidence - 20);
+          this.duelLog(cur.name + ': COLD READ! Jury massively swayed. Witness shaken.', 'drama');
+        }
+        d.lastResult = 'good'; d.lastSide = d.turn === 1 ? 'player' : 'opp';
+        endTurn(); break;
+      }
+      case 'd_closing': {
+        const stmtCount2 = S.caseData ? S.caseData.statements.length : 1;
+        const closingOk = d.statementsResolved >= Math.ceil(stmtCount2 * 0.5) || oth.cred < 45 || d.round >= Math.max(8, d.maxRounds - 4);
+        if (!closingOk) { endTurn(); break; }
+        Snd.drama && Snd.drama(); Snd.gavel && Snd.gavel(); Canvas.flashIt && Canvas.flashIt();
+        UI.bigCue && UI.bigCue('CLOSING ARGUMENT', 1200);
+        const charm = cur.style === 'closer' ? 20 : cur.style === 'charmer' ? 12 : 0;
+        const jBonus = d.turn === 1 ? d.jury : -d.jury;
+        const score = (cur.cred - oth.cred) + jBonus * 1.5 + charm;
+        d.ended = true;
+        const winner = score > 20 ? cur.name : score < -15 ? oth.name : 'hung';
+        this.duelLog(cur.name + ': CLOSING ARGUMENT. Score ' + Math.round(score) + '. ' +
+          (winner === 'hung' ? 'Hung jury.' : winner + ' WINS!'), 'drama');
+        const selfClos = this;
+        setTimeout(function () { selfClos.endDuelMatch(winner); }, 1400);
+        return;
+      }
+    }
+  };
+
+  Game.duelCourtPresent = function (idx) {
+    const d = S.duel;
+    if (!d || d.ended) return;
+    const cur = d.turn === 1 ? d.p1 : d.p2;
+    const oth = d.turn === 1 ? d.p2 : d.p1;
+    const jDir = d.turn === 1 ? 1 : -1;
+    const card = cur.hand[idx];
+    if (!card || card.used) return;
+    card.used = true;
+    const stmt = S.caseData && d.statementIdx < S.caseData.statements.length ? S.caseData.statements[d.statementIdx] : null;
+    const isMatch = stmt && card.id === stmt.weakness;
+    Snd.evidence && Snd.evidence(); Canvas.flashIt && Canvas.flashIt();
+    const self = this;
+
+    if (isMatch) {
+      Snd.drama && Snd.drama();
+      UI.bigCue && UI.bigCue('EVIDENCE MATCH!', 900);
+      const hit = Math.round(12 + card.strength * 1.2 + Math.random() * 8);
+      oth.cred = Math.max(0, oth.cred - hit);
+      d.jury = Math.max(-50, Math.min(50, d.jury + jDir * 8));
+      d.witnessConfidence = Math.max(0, d.witnessConfidence - 20);
+      d.combo[d.turn]++; d.focus[d.turn] = Math.min(100, d.focus[d.turn] + 8);
+      Canvas.addFloater && Canvas.addFloater('💥 -' + hit, d.turn === 1 ? 590 : 230, 170, '#ffdc5c');
+      this.duelLog(cur.name + ': ' + card.name + ' — PERFECT MATCH! ' + oth.name + ' -' + hit + '. Jury shifts!', 'drama');
+      d.lastResult = 'good'; d.lastSide = d.turn === 1 ? 'player' : 'opp';
+      d.statementsResolved++; this.duelAdvanceStatement();
+    } else {
+      if (Math.random() > card.risk * 0.12) {
+        const hit = Math.round(6 + card.strength * 0.7 + Math.random() * 5);
+        oth.cred = Math.max(0, oth.cred - hit);
+        d.jury = Math.max(-50, Math.min(50, d.jury + jDir * 4));
+        Canvas.addFloater && Canvas.addFloater('-' + hit, d.turn === 1 ? 590 : 230, 190, '#d44a3a');
+        this.duelLog(cur.name + ': Presents ' + card.name + '. ' + oth.name + ' -' + hit + '.', 'good');
+        d.lastResult = 'good'; d.lastSide = d.turn === 1 ? 'player' : 'opp';
+      } else {
+        const pen = Math.round(4 + card.risk * 2);
+        cur.cred = Math.max(0, cur.cred - pen);
+        d.judge = Math.max(0, d.judge - 5); d.combo[d.turn] = 0;
+        Canvas.addFloater && Canvas.addFloater('-' + pen, d.turn === 1 ? 230 : 590, 190, '#d44a3a');
+        this.duelLog(cur.name + ': ' + card.name + ' challenged. -' + pen + ' cred.', 'bad');
+        d.lastResult = 'bad'; d.lastSide = d.turn === 1 ? 'player' : 'opp';
+      }
+    }
+
+    d.round++;
+    if (oth.cred <= 0) { d.ended = true; this.duelLog(oth.name + ' collapses. ' + cur.name + ' WINS!', 'drama'); setTimeout(function () { self.endDuelMatch(cur.name); }, 800); return; }
+    if (cur.cred <= 0) { d.ended = true; this.duelLog(cur.name + ' collapses. ' + oth.name + ' WINS!', 'drama'); setTimeout(function () { self.endDuelMatch(oth.name); }, 800); return; }
+    if (d.round > d.maxRounds) {
+      d.ended = true;
+      const w = d.jury > 5 ? d.p1.name : d.jury < -5 ? d.p2.name : 'hung';
+      setTimeout(function () { self.endDuelMatch(w); }, 800);
+      return;
+    }
+    this.duelPassTurn();
+  };
+
+  Game.duelAdvanceStatement = function () {
+    const d = S.duel;
+    if (!d) return;
+    d.witnessConfidence = 100;
+    d.statementIdx++;
+    const stmtCount = S.caseData ? S.caseData.statements.length : 0;
+    if (d.statementIdx < stmtCount) {
+      this.duelLog('━━ Next statement ━━', 'drama');
+      Snd.gavel && Snd.gavel();
+    } else {
+      this.duelLog('All statements examined. Closing argument now available!', 'drama');
+    }
+  };
+
+  Game.duelPassTurn = function () {
+    const d = S.duel;
+    if (!d || d.ended) return;
+    const nextTurn = d.turn === 1 ? 2 : 1;
+    const nextPlayer = nextTurn === 1 ? d.p1 : d.p2;
+    const role = nextTurn === 1 ? 'Defense' : 'Prosecution';
+    const overlay = document.getElementById('passControllerOverlay');
+    const self = this;
+    if (overlay) {
+      const nameEl = document.getElementById('passPlayerName');
+      const roleEl = document.getElementById('passRoleLabel');
+      if (nameEl) nameEl.textContent = nextPlayer.name;
+      if (roleEl) roleEl.textContent = role;
+      overlay.classList.remove('hidden');
+      const btn = document.getElementById('passReadyBtn');
+      if (btn) btn.onclick = function () {
+        overlay.classList.add('hidden');
+        d.turn = nextTurn;
+        S.player = { name: nextPlayer.name, style: nextPlayer.style, stats: nextPlayer.stats, money: 0, reputation: 0, wins: 0, perks: [] };
+        self.renderDuelCourt();
+      };
+    } else {
+      d.turn = nextTurn;
+      S.player = { name: nextPlayer.name, style: nextPlayer.style, stats: nextPlayer.stats, money: 0, reputation: 0, wins: 0, perks: [] };
+      this.renderDuelCourt();
+    }
+  };
+
+  Game.duelLog = function (text, kind) {
+    UI.log('courtLog', text, kind || '');
+  };
+
+  Game.endDuelMatch = function (winnerName) {
+    const caseTitle = S.caseData ? S.caseData.title : 'The Duel';
+    S.duel = null; S.court = null;
+    Snd.stopMurmur && Snd.stopMurmur();
+    if (winnerName === 'hung') {
+      Snd.loss && Snd.loss();
+      UI.$('verdictTitle').textContent = 'HUNG JURY';
+      UI.$('verdictArt').textContent = '⚖️';
+      UI.$('verdictText').textContent = 'Neither side could claim a decisive victory. The court is dismissed.';
+    } else {
+      Snd.victory && Snd.victory();
+      UI.$('verdictTitle').textContent = winnerName.toUpperCase() + ' WINS';
+      UI.$('verdictArt').textContent = '⚖️ ★';
+      UI.$('verdictText').textContent = winnerName + ' walks out of court vindicated. A masterclass in courtroom combat.';
+    }
+    UI.$('rewardBox').innerHTML = '<div><b>Case:</b> ' + caseTitle + '</div><div style="color:var(--ink-dim);font-size:12px;margin-top:4px">Duel Mode — no campaign rewards.</div>';
+    UI.$('nextCaseBtn').textContent = 'Another Duel →';
+    const self = this;
+    UI.$('nextCaseBtn').onclick = function () { self.startDuelSetup(); };
+    S.caseData = null;
+    UI.switchTo('verdict');
+  };
+
+  const _origEndDuel = Game.endDuel && Game.endDuel.bind(Game);
+  if (_origEndDuel) {
+    Game.endDuel = function (winnerName) {
+      if (S.duel && S.duel.active) { this.endDuelMatch(winnerName); }
+      else if (_origEndDuel) { _origEndDuel(winnerName); }
+    };
+  }
+
+  const _origRenderDuel = Game.renderDuel && Game.renderDuel.bind(Game);
+  Game.renderDuel = function () {
+    if (S.duel && S.duel.active && S.caseData) { this.renderDuelCourt(); }
+    else if (_origRenderDuel) { _origRenderDuel(); }
+  };
+
+  console.log('[Duel Overhaul] Real case-based duel mode with pass-controller loaded.');
+})();
+
+
+/* ============================================================
+ * VISUAL & UI ENHANCEMENTS
+ * Better canvas courtroom, homepage effects, evidence match glow,
+ * combo toasts, and pixel-art polish.
+ * ============================================================ */
+(function visualEnhancements() {
+  if (typeof Canvas === 'undefined') return;
+
+  /* Enhanced canvas courtroom */
+  Canvas.drawCourtroom = function () {
+    const ctx = this.ctx;
+    const W = this.w, H = this.h;
+
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#0e0520');
+    sky.addColorStop(0.4, '#1a1226');
+    sky.addColorStop(1, '#0d0818');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, W, H);
+
+    this.px(0, 55, W, 125, PAL.wood);
+    for (let x = 0; x < W; x += 80) { this.px(x, 55, 2, 125, PAL.woodDark); }
+    ctx.globalAlpha = 0.07;
+    for (let i = 0; i < 5; i++) {
+      ctx.strokeStyle = '#e8c9a0'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(i * 180 + 20, 60);
+      ctx.bezierCurveTo(i * 180 + 40, 90, i * 180 + 10, 120, i * 180 + 50, 160);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    const windows = [[40, 65, 80, 55], [620, 65, 80, 55]];
+    const self = this;
+    windows.forEach(function (arr) {
+      const wx = arr[0], wy = arr[1], ww = arr[2], wh = arr[3];
+      self.px(wx, wy, ww, wh, PAL.woodDark);
+      self.px(wx + 6, wy + 6, ww - 12, wh - 12, '#1a2a4a');
+      ctx.globalAlpha = 0.18 + 0.06 * Math.sin(Date.now() / 1200);
+      ctx.fillStyle = '#3a6ad4';
+      ctx.fillRect(wx + 6, wy + 6, (ww - 12) / 2 - 2, wh - 12);
+      ctx.fillStyle = '#7a3ab8';
+      ctx.fillRect(wx + 6 + (ww - 12) / 2 + 2, wy + 6, (ww - 12) / 2 - 2, wh - 12);
+      ctx.globalAlpha = 1;
+      self.px(wx + (ww / 2) - 1, wy + 6, 2, wh - 12, PAL.woodDark);
+      self.px(wx + 6, wy + (wh / 2), ww - 12, 2, PAL.woodDark);
+    });
+
+    this.px(300, 60, 200, 80, PAL.wood);
+    ctx.globalAlpha = 0.25;
+    ctx.strokeStyle = PAL.gold; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(400, 110, 38, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(400, 110, 28, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = 1;
+    this.px(396, 95, 8, 30, PAL.woodDark);
+    this.px(388, 117, 24, 6, PAL.woodDark);
+
+    const t = Date.now() / 600;
+    const gravelX = 380 + Math.round(Math.sin(t) * 3);
+    const gravelY = 50 + Math.round(Math.abs(Math.sin(t * 0.5)) * 6);
+    this.px(gravelX, gravelY, 14, 6, '#8B6914');
+    this.px(gravelX + 2, gravelY + 4, 10, 14, '#7a5c0e');
+    this.px(gravelX + 4, gravelY + 16, 6, 3, '#5a3c0a');
+
+    this.px(0, 180, W, 8, PAL.woodDark);
+    this.px(0, 310, W, 50, PAL.floor);
+    this.px(0, 310, W, 4, '#1a1410');
+    for (let x = 0; x < W; x += 60) { this.px(x, 310, 2, 50, '#1a1410'); }
+
+    this.px(160, 188, 120, 100, PAL.wood);
+    this.px(520, 188, 120, 100, PAL.wood);
+    this.px(162, 186, 116, 4, PAL.gold);
+    this.px(522, 186, 116, 4, PAL.gold);
+    this.px(168, 192, 8, 6, '#d4c070');
+    this.px(184, 192, 8, 6, '#d4c070');
+    this.px(528, 192, 8, 6, '#d4c070');
+    this.px(544, 192, 8, 6, '#d4c070');
+
+    const isDuel = S.court && S.court.mode === 'duel';
+    if (isDuel && S.duel) {
+      const activeSide = S.duel.turn === 1 ? 160 : 520;
+      ctx.globalAlpha = 0.35 + 0.1 * Math.sin(Date.now() / 400);
+      ctx.fillStyle = '#ffdc5c';
+      ctx.fillRect(activeSide, 184, 120, 4);
+      ctx.globalAlpha = 1;
+    }
+
+    const juryMood = S.court ? S.court.jury || 0 : 0;
+    const excited = Math.abs(juryMood) > 20;
+    for (let j = 0; j < 6; j++) {
+      const jx = 310 + j * 26;
+      const jy = excited ? 188 + Math.round(Math.sin(Date.now() / 180 + j) * 3) : 190;
+      this.px(jx, jy, 10, 12, j % 2 === 0 ? '#4a3a8a' : '#2a4a6a');
+      this.px(jx + 2, jy - 5, 6, 6, '#e8c9a0');
+    }
+
+    if (S.court && S.court.mode !== 'duel') {
+      this.px(340, 145, 120, 80, PAL.woodDark);
+      this.px(342, 143, 116, 4, PAL.gold);
+    }
+
+    if (this.bubble && this.bubble.timer > 0) {
+      const bx = this.bubble.side === 'player' ? 210 : 530;
+      const by = 155;
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.strokeStyle = '#1a0a2a'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(bx, by, 110, 30, 6) : ctx.rect(bx, by, 110, 30);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#1a0a2a'; ctx.font = 'bold 10px monospace';
+      ctx.fillText(this.bubble.text.substring(0, 16), bx + 6, by + 18);
+      this.bubble.timer--;
+    }
+  };
+
+  Canvas.bubble = null;
+  Canvas.showBubble = function (text, side) { this.bubble = { text: text, side: side, timer: 90 }; };
+
+  /* Homepage shimmer particles */
+  (function () {
+    const menu = document.getElementById('menu');
+    if (!menu) return;
+    const canvas = document.createElement('canvas');
+    canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:0.35';
+    menu.style.position = 'relative';
+    menu.insertBefore(canvas, menu.firstChild);
+    const particles = Array.from({ length: 28 }, function () {
+      return { x: Math.random(), y: Math.random(), vy: 0.0003 + Math.random() * 0.0004, size: 1 + Math.random() * 2, alpha: Math.random() };
+    });
+    function tick() {
+      canvas.width = menu.offsetWidth; canvas.height = menu.offsetHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(function (p) {
+        p.y -= p.vy; if (p.y < 0) p.y = 1;
+        ctx.globalAlpha = 0.3 + 0.5 * Math.abs(Math.sin(p.alpha + Date.now() / 1800));
+        ctx.fillStyle = '#d4a82c';
+        ctx.fillRect(Math.round(p.x * canvas.width), Math.round(p.y * canvas.height), p.size, p.size);
+      });
+      ctx.globalAlpha = 1;
+      requestAnimationFrame(tick);
+    }
+    tick();
+  })();
+
+  console.log('[Visual Enhancements] courtroom canvas and homepage particles loaded.');
+})();

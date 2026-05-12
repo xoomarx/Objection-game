@@ -2318,3 +2318,162 @@ body.lang-ar .case-stamp { transform: rotate(2deg); }
 @media (max-width: 700px) {
   .firebase-players { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+ * PASS CONTROLLER OVERLAY
+ * ============================================================ */
+.pass-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 4, 20, 0.96);
+  backdrop-filter: blur(4px);
+}
+.pass-overlay.hidden { display: none !important; }
+.pass-card {
+  background: var(--bg-1, #12082a);
+  border: 2px solid var(--gold, #d4a82c);
+  border-radius: 4px;
+  padding: 40px 48px;
+  text-align: center;
+  max-width: 480px;
+  width: 90%;
+  position: relative;
+}
+.pass-card::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border: 1px dashed rgba(212,168,44,0.3);
+  border-radius: 2px;
+  pointer-events: none;
+}
+.pass-gavel {
+  font-size: 52px;
+  display: block;
+  margin-bottom: 12px;
+  animation: gavelBounce 1.4s ease-in-out infinite;
+}
+.pass-stamp {
+  font-family: var(--font-pixel, monospace);
+  font-size: 11px;
+  letter-spacing: 4px;
+  color: var(--gold, #d4a82c);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  opacity: 0.7;
+}
+.pass-player {
+  font-family: Georgia, serif;
+  font-size: 38px;
+  font-weight: bold;
+  color: var(--gold, #d4a82c);
+  text-shadow: 0 0 18px rgba(212,168,44,0.7);
+  margin-bottom: 4px;
+  line-height: 1.1;
+}
+.pass-role {
+  font-family: var(--font-pixel, monospace);
+  font-size: 13px;
+  letter-spacing: 2px;
+  color: var(--ink-dim, #a090b0);
+  margin-bottom: 18px;
+  text-transform: uppercase;
+}
+.pass-hint {
+  font-size: 12px;
+  color: var(--ink-dim, #a090b0);
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+#passReadyBtn {
+  animation: readyPulse 1.8s ease-in-out infinite;
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+/* ============================================================
+ * VISUAL ENHANCEMENTS
+ * ============================================================ */
+
+/* Evidence match glow */
+.ev-card.match-hint {
+  border-color: var(--gold, #d4a82c) !important;
+  box-shadow: 0 0 12px rgba(212,168,44,0.55);
+  animation: matchGlow 1.2s ease-in-out infinite alternate;
+}
+
+/* Richer bar fills */
+.fill.blue   { background: linear-gradient(90deg, #1e6fcc, #4a9eff); }
+.fill.red    { background: linear-gradient(90deg, #aa1a1a, #e04444); }
+.fill.gold   { background: linear-gradient(90deg, #8a6200, #d4a82c); }
+.fill.purple { background: linear-gradient(90deg, #5a1a8a, #9a4ad4); }
+.fill.green  { background: linear-gradient(90deg, #1a6a2a, #4aaa5a); }
+.fill.clock  { background: linear-gradient(90deg, #1a4a6a, #2a8aaa); }
+.fill.focus  { background: linear-gradient(90deg, #4a1a6a, #9a3ad4); }
+
+/* Menu title animations */
+.menu-title-objection {
+  background: linear-gradient(135deg, #d4a82c 0%, #fff8e0 50%, #d4a82c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: titleFlicker 3.5s ease-in-out infinite;
+}
+.menu-screen {
+  position: relative;
+  overflow: hidden;
+}
+.menu-screen::before, .menu-screen::after {
+  content: '⚖';
+  position: absolute;
+  font-size: 40px;
+  opacity: 0.08;
+  animation: cornerPulse 4s ease-in-out infinite;
+}
+.menu-screen::before { top: 12px; left: 12px; }
+.menu-screen::after  { bottom: 12px; right: 12px; animation-delay: 2s; }
+.pixel-lawyer {
+  animation: lawyerBob 2.2s ease-in-out infinite;
+}
+.hero-right { animation-delay: 0.6s; }
+
+/* Duel side color accents */
+.duel-side:first-child  { border-color: var(--blue, #2a6acc); }
+.duel-side:last-child   { border-color: var(--red, #cc2a2a); }
+
+/* Keyframes */
+@keyframes gavelBounce {
+  0%, 100% { transform: rotate(-8deg) translateY(0); }
+  50%       { transform: rotate(8deg) translateY(-8px); }
+}
+@keyframes readyPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212,168,44,0); }
+  50%       { box-shadow: 0 0 0 6px rgba(212,168,44,0.35); }
+}
+@keyframes matchGlow {
+  from { box-shadow: 0 0 8px rgba(212,168,44,0.4); }
+  to   { box-shadow: 0 0 18px rgba(212,168,44,0.9); }
+}
+@keyframes titleFlicker {
+  0%, 90%, 100% { opacity: 1; }
+  92%            { opacity: 0.7; }
+  94%            { opacity: 1; }
+  96%            { opacity: 0.8; }
+}
+@keyframes cornerPulse {
+  0%, 100% { opacity: 0.06; transform: scale(1); }
+  50%       { opacity: 0.14; transform: scale(1.15); }
+}
+@keyframes lawyerBob {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-6px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pass-gavel, #passReadyBtn, .ev-card.match-hint,
+  .menu-title-objection, .pixel-lawyer { animation: none; }
+}
