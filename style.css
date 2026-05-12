@@ -3057,3 +3057,564 @@ button.big.primary::after {
   opacity: 0.85;
   margin-bottom: 8px;
 }
+
+/* ================================================================
+ * COURT EXPERIENCE DIRECTOR v3
+ * Layout cleanup, scene tags, evidence moments, and responsive court UI.
+ * ================================================================ */
+body.court-mode {
+  overflow-x: hidden;
+}
+
+body.court-mode #app {
+  max-width: min(1260px, calc(100vw - 22px));
+  padding: 8px 10px 12px;
+}
+
+body.court-mode #topbar {
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 8px;
+  padding: 7px 10px;
+  flex-wrap: wrap;
+}
+
+body.court-mode #topbar .grow { display: none; }
+body.court-mode #topbar button { min-height: 30px; }
+body.court-mode #caseLabel { flex: 1 1 240px; min-width: 180px; }
+body.court-mode #playerLabel { flex: 1 1 220px; min-width: 180px; }
+body.court-mode #moneyLabel,
+body.court-mode #repLabel,
+body.court-mode #muteBtn,
+body.court-mode #voiceBtn,
+body.court-mode #langBtn,
+body.court-mode #menuBtn {
+  flex: 0 0 auto;
+}
+
+body.court-mode #court.screen {
+  padding: 10px;
+  margin-bottom: 0;
+  min-height: calc(100vh - 120px);
+  background:
+    linear-gradient(180deg, rgba(42,31,61,0.92), rgba(13,8,24,0.96)),
+    var(--bg-1);
+}
+
+body.court-mode .court-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 390px);
+  gap: 12px;
+  align-items: start;
+}
+
+body.court-mode .court-left-col {
+  position: sticky;
+  top: 8px;
+  max-height: calc(100vh - 126px);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+body.court-mode .court-left-col::-webkit-scrollbar,
+body.court-mode .court-right-col::-webkit-scrollbar,
+body.court-mode #courtActions::-webkit-scrollbar,
+body.court-mode #evidenceRow::-webkit-scrollbar,
+body.court-mode #courtLog::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+body.court-mode .court-left-col::-webkit-scrollbar-track,
+body.court-mode .court-right-col::-webkit-scrollbar-track,
+body.court-mode #courtActions::-webkit-scrollbar-track,
+body.court-mode #evidenceRow::-webkit-scrollbar-track,
+body.court-mode #courtLog::-webkit-scrollbar-track {
+  background: rgba(0,0,0,0.22);
+}
+
+body.court-mode .court-left-col::-webkit-scrollbar-thumb,
+body.court-mode .court-right-col::-webkit-scrollbar-thumb,
+body.court-mode #courtActions::-webkit-scrollbar-thumb,
+body.court-mode #evidenceRow::-webkit-scrollbar-thumb,
+body.court-mode #courtLog::-webkit-scrollbar-thumb {
+  background: rgba(212,168,44,0.45);
+  border-radius: 4px;
+}
+
+body.court-mode #courtCanvasWrap {
+  margin: 0;
+  border-color: rgba(244,208,88,0.9);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.6), 0 14px 36px rgba(0,0,0,0.24);
+  background: #05030a;
+}
+
+body.court-mode .court-left-col #courtCanvasWrap canvas,
+body.court-mode #courtCanvas {
+  width: 100%;
+  max-width: none;
+  height: auto;
+}
+
+.court-scene-banner {
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  z-index: 4;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  max-width: calc(100% - 20px);
+  pointer-events: none;
+}
+
+.court-scene-pill {
+  padding: 4px 8px;
+  background: rgba(13,8,24,0.72);
+  border: 1px solid rgba(244,208,88,0.65);
+  color: var(--gold-bright);
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.45);
+}
+
+.court-scene-pill.muted {
+  color: var(--ink-dim);
+  border-color: rgba(255,255,255,0.16);
+  background: rgba(0,0,0,0.45);
+}
+
+.court-director-strip {
+  border: 1px solid rgba(212,168,44,0.38);
+  background: linear-gradient(180deg, rgba(42,31,61,0.9), rgba(18,10,32,0.92));
+  padding: 9px 10px;
+  margin-bottom: 8px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+.court-director-main {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.court-director-name {
+  color: var(--gold-bright);
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.court-director-win {
+  color: var(--green);
+  font-size: 10px;
+  text-align: right;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.court-director-hint {
+  color: var(--ink-dim);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+body.court-mode .court-right-col {
+  position: sticky;
+  top: 8px;
+  display: grid;
+  grid-template-rows: auto minmax(190px, auto) minmax(128px, 210px) auto auto minmax(120px, 1fr);
+  gap: 8px;
+  max-height: calc(100vh - 126px);
+  overflow: hidden;
+  padding: 0;
+}
+
+body.court-mode #courtActions.actions-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 7px;
+  max-height: 248px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid rgba(212,168,44,0.5);
+  background: rgba(13,8,24,0.72);
+}
+
+body.court-mode #courtActions::before,
+body.court-mode #evidenceRow::before,
+body.court-mode #courtLog::before {
+  display: block;
+  width: 100%;
+  grid-column: 1 / -1;
+  color: rgba(244,208,88,0.78);
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+body.court-mode #courtActions::before { content: "Tactical Bench"; }
+body.court-mode #evidenceRow::before { content: "Evidence Dock"; }
+body.court-mode #courtLog::before { content: "Court Transcript"; }
+
+body.court-mode #courtActions .act-group-lbl {
+  grid-column: 1 / -1;
+  width: auto;
+  padding: 6px 0 1px;
+  margin: 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+body.court-mode #courtActions button {
+  min-height: 38px;
+  width: 100%;
+  white-space: normal;
+  padding: 8px 9px;
+  font-size: 10.5px;
+  line-height: 1.25;
+  letter-spacing: 0.9px;
+  box-shadow: 0 2px 0 rgba(0,0,0,0.6);
+}
+
+body.court-mode #courtActions button[data-action-family="core"] {
+  border-color: #64a6ff;
+}
+
+body.court-mode #courtActions button[data-action-family="recovery"] {
+  border-color: #71c77a;
+}
+
+body.court-mode #courtActions button[data-action-family="finisher"],
+body.court-mode #courtActions button.primary {
+  border-color: var(--gold-bright);
+  background: rgba(212,168,44,0.22);
+  color: var(--gold-bright);
+}
+
+body.court-mode #courtActions button[data-action-family="witness"] {
+  border-color: #b46aff;
+  color: #f0d7ff;
+}
+
+body.court-mode #evidenceRow.card-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-height: 0;
+  max-height: 210px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 10px;
+  border: 1px dashed rgba(212,168,44,0.58);
+  background: rgba(5,3,10,0.62);
+}
+
+body.court-mode #evidenceRow .ev-card {
+  min-width: 0;
+  width: 100%;
+  flex: initial;
+  padding: 9px;
+  font-size: 10.5px;
+}
+
+body.court-mode #evidenceRow .ev-card .ev-desc {
+  min-height: 30px;
+  max-height: 44px;
+  overflow: hidden;
+}
+
+body.court-mode #objectionRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(212,168,44,0.5);
+  background: rgba(13,8,24,0.78);
+}
+
+body.court-mode #objectionRow.hidden { display: none !important; }
+body.court-mode #objectionRow button { width: 100%; white-space: normal; }
+
+body.court-mode #courtLog.log {
+  height: 100%;
+  align-self: stretch;
+  max-height: none;
+  min-height: 120px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 10px;
+  background: rgba(5,3,10,0.78);
+  border-color: rgba(212,168,44,0.42);
+}
+
+body.court-mode .court-right-col .log-toggle-btn {
+  margin: 0;
+  justify-self: start;
+  min-height: 28px;
+}
+
+body.court-mode #courtLog .entry {
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  border-left: 3px solid rgba(212,168,44,0.18);
+  background: rgba(255,255,255,0.025);
+}
+
+body.court-mode #courtLog .entry.good { border-left-color: var(--green); }
+body.court-mode #courtLog .entry.bad { border-left-color: var(--red); }
+body.court-mode #courtLog .entry.drama { border-left-color: var(--gold-bright); }
+body.court-mode #courtLog .entry.ai { border-left-color: var(--purple); }
+
+body.court-mode .court-left-col .statement {
+  margin: 8px 0;
+  min-height: 0;
+  padding: 12px 16px 14px;
+  background: linear-gradient(180deg, #2a1f3d 0%, #1a1226 100%);
+  color: var(--ink);
+  border: 1px solid rgba(212,168,44,0.6);
+  border-left: 4px solid var(--gold-bright);
+}
+
+body.court-mode .court-left-col .statement .who,
+body.court-mode .court-left-col .statement .quote {
+  color: var(--ink);
+}
+
+body.court-mode .court-left-col .statement .quote {
+  font-size: clamp(13px, 1.25vw, 16px);
+  line-height: 1.48;
+}
+
+body.court-mode .court-left-col .statement .hint {
+  color: var(--gold-bright);
+  background: rgba(212,168,44,0.08);
+  border-top: 0;
+  border-left: 3px solid var(--gold);
+}
+
+body.court-mode .stmt-counter {
+  color: rgba(244,208,88,0.74);
+  border-bottom-color: rgba(212,168,44,0.22);
+}
+
+body.court-mode .bars {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
+  margin: 0 0 8px;
+  padding: 9px;
+  background: rgba(13,8,24,0.68);
+  border: 1px solid rgba(212,168,44,0.55);
+}
+
+body.court-mode .bar-row,
+body.court-mode .bar-row.mini {
+  grid-column: span 1;
+  gap: 6px;
+}
+
+body.court-mode .bar-label {
+  width: 58px;
+  font-size: 9.5px;
+}
+
+body.court-mode .num {
+  width: 34px;
+  font-size: 10px;
+}
+
+body.court-mode .bar {
+  height: 13px;
+}
+
+body.court-mode .court-tactics {
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(212,168,44,0.45);
+  background: rgba(5,3,10,0.55);
+}
+
+body.court-mode .tactic-tip {
+  display: block;
+  margin-top: 7px;
+  color: var(--ink-dim);
+  line-height: 1.35;
+}
+
+body.court-mode .body-lang-panel {
+  margin: 8px 0;
+  padding: 0;
+  background: transparent;
+}
+
+body.court-mode .body-lang-badge {
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 10.5px;
+  border-radius: 2px;
+  background: rgba(5,3,10,0.55);
+}
+
+.evidence-moment {
+  position: fixed;
+  inset: 0;
+  z-index: 9800;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 45%, rgba(244,208,88,0.16), rgba(13,8,24,0.82) 62%);
+  animation: evidenceMomentFade 1.45s ease forwards;
+}
+
+.evidence-moment-card {
+  width: min(380px, 82vw);
+  background: var(--paper);
+  color: var(--bg-0);
+  border: 3px solid var(--gold-bright);
+  box-shadow: 0 18px 0 rgba(0,0,0,0.45), 0 0 42px rgba(244,208,88,0.35);
+  padding: 18px;
+  transform: rotate(-2deg) scale(0.82);
+  animation: evidenceCardPop 1.2s cubic-bezier(.18,1.35,.4,1) forwards;
+}
+
+.evidence-moment.bad .evidence-moment-card {
+  border-color: var(--red);
+  box-shadow: 0 18px 0 rgba(0,0,0,0.45), 0 0 38px rgba(212,74,58,0.42);
+}
+
+.evidence-moment-title {
+  color: #4a260e;
+  border-bottom: 1px solid rgba(74,38,14,0.35);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.evidence-moment-desc {
+  color: #5a3818;
+  font-style: italic;
+  line-height: 1.45;
+  margin-bottom: 10px;
+}
+
+.evidence-moment-line {
+  color: var(--bg-0);
+  background: rgba(212,168,44,0.18);
+  border-left: 4px solid var(--gold);
+  padding: 8px 10px;
+  line-height: 1.4;
+}
+
+.evidence-moment.bad .evidence-moment-line {
+  background: rgba(212,74,58,0.12);
+  border-left-color: var(--red);
+}
+
+@keyframes evidenceMomentFade {
+  0% { opacity: 0; }
+  10%, 72% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes evidenceCardPop {
+  0% { transform: rotate(-7deg) scale(0.46); opacity: 0; }
+  18% { transform: rotate(-2deg) scale(1.05); opacity: 1; }
+  70% { transform: rotate(-1deg) scale(1); opacity: 1; }
+  100% { transform: rotate(2deg) scale(0.92); opacity: 0; }
+}
+
+.scene-theme-corporateTribunal #courtCanvasWrap { border-color: #87d9ff; }
+.scene-theme-fashionTribunal #courtCanvasWrap { border-color: #ff7bd6; }
+.scene-theme-mediaCourtroom #courtCanvasWrap { border-color: #ffffff; }
+.scene-theme-emergencyNightHearing #courtCanvasWrap { border-color: #73a6ff; }
+.scene-theme-corruptionFinalCourt #courtCanvasWrap { border-color: #ff5656; }
+
+@media (max-width: 1120px) {
+  body.court-mode #app {
+    max-width: min(1000px, calc(100vw - 16px));
+  }
+
+  body.court-mode .court-layout {
+    grid-template-columns: 1fr;
+  }
+
+  body.court-mode .court-left-col,
+  body.court-mode .court-right-col {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  body.court-mode .court-right-col {
+    grid-template-rows: auto;
+  }
+
+  body.court-mode #courtActions.actions-row {
+    max-height: none;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  body.court-mode #evidenceRow.card-row {
+    max-height: none;
+    grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  }
+
+  body.court-mode #courtLog.log {
+    max-height: 190px;
+  }
+}
+
+@media (max-width: 720px) {
+  body.court-mode #topbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  body.court-mode #caseLabel,
+  body.court-mode #playerLabel {
+    grid-column: span 2;
+    white-space: normal;
+  }
+
+  body.court-mode #court.screen {
+    padding: 7px;
+  }
+
+  body.court-mode .bars {
+    grid-template-columns: 1fr;
+  }
+
+  body.court-mode .bar-row,
+  body.court-mode .bar-row.mini {
+    grid-column: span 1;
+  }
+
+  body.court-mode #courtActions.actions-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body.court-mode #evidenceRow.card-row {
+    grid-template-columns: 1fr;
+  }
+
+  .court-scene-banner {
+    top: 5px;
+    left: 5px;
+  }
+
+  .court-scene-pill {
+    font-size: 8px;
+    letter-spacing: 1px;
+    padding: 3px 5px;
+  }
+}

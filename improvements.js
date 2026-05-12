@@ -5408,3 +5408,1531 @@
 
   console.log('[courtVariety_v2] Richer log messages, statement tips, and judge reactions loaded.');
 })();
+
+/* ============================================================
+   COURT EXPERIENCE DIRECTOR v3
+   - Normalizes sceneTheme/trialPattern data across all cases
+   - Adds visible case-specific courtroom scenery
+   - Adds controlled trial events, evidence timing, and live reactions
+   - Reorganizes court UI without removing existing systems
+   ============================================================ */
+(function courtExperienceDirector_v3() {
+  if (typeof Game === 'undefined' || typeof S === 'undefined' || typeof Canvas === 'undefined') return;
+
+  var SCENE_THEMES = {
+    classicCourtroom: {
+      name: 'Classic Courtroom',
+      tone: 'formal wood-paneled court',
+      wallTop: '#2b1b38', wallMid: '#5a3418', floor: '#21150d', carpet: '#571a2a',
+      accent: '#d4a82c', light: '#f4d058', bench: '#6b3e1f', desk: '#553018',
+      audience: 'jury', props: 'law books and flags'
+    },
+    smallCityCourt: {
+      name: 'Small City Court',
+      tone: 'tight local courtroom',
+      wallTop: '#22334a', wallMid: '#775b34', floor: '#2c2418', carpet: '#345d67',
+      accent: '#e0b85a', light: '#ffe08a', bench: '#6a4724', desk: '#49351e',
+      audience: 'small jury', props: 'fluorescent lights and filing boxes'
+    },
+    corporateTribunal: {
+      name: 'Corporate Tribunal',
+      tone: 'glass and steel hearing room',
+      wallTop: '#162838', wallMid: '#263f4b', floor: '#111820', carpet: '#1f4250',
+      accent: '#87d9ff', light: '#d8fbff', bench: '#23313a', desk: '#1d2a32',
+      audience: 'executives', props: 'screens, charts, glass panels'
+    },
+    mediaCourtroom: {
+      name: 'Media Courtroom',
+      tone: 'press-heavy public trial',
+      wallTop: '#251a2d', wallMid: '#3c3044', floor: '#171019', carpet: '#4d2441',
+      accent: '#ffffff', light: '#ffec9a', bench: '#51311f', desk: '#3a2630',
+      audience: 'press', props: 'cameras, microphones, flash bulbs'
+    },
+    emergencyNightHearing: {
+      name: 'Emergency Night Hearing',
+      tone: 'after-hours emergency session',
+      wallTop: '#07172e', wallMid: '#152948', floor: '#080a12', carpet: '#19365b',
+      accent: '#73a6ff', light: '#c6dcff', bench: '#2a2c3c', desk: '#181c2c',
+      audience: 'thin gallery', props: 'moonlit windows and desk lamps'
+    },
+    fashionTribunal: {
+      name: 'Fashion Tribunal',
+      tone: 'style-industry arbitration hall',
+      wallTop: '#35153d', wallMid: '#5a2b56', floor: '#1c1020', carpet: '#9b326e',
+      accent: '#ff7bd6', light: '#ffe4fb', bench: '#59304d', desk: '#3b1f35',
+      audience: 'design press', props: 'mannequins, sketch boards, runway lights'
+    },
+    grandAppealsCourt: {
+      name: 'Grand Appeals Court',
+      tone: 'marble appellate chamber',
+      wallTop: '#2d3142', wallMid: '#6c6876', floor: '#1d1b22', carpet: '#4b1535',
+      accent: '#e6d39a', light: '#fff0bc', bench: '#4a3326', desk: '#33261e',
+      audience: 'clerks', props: 'columns, seals, high bench'
+    },
+    privateArbitrationRoom: {
+      name: 'Private Arbitration',
+      tone: 'closed-door conference hearing',
+      wallTop: '#1f2c2f', wallMid: '#52645f', floor: '#182320', carpet: '#33453d',
+      accent: '#a7d6b8', light: '#e2ffe8', bench: '#35463e', desk: '#263a32',
+      audience: 'observers', props: 'conference table, plants, water glasses'
+    },
+    corruptionFinalCourt: {
+      name: 'Final Corruption Court',
+      tone: 'high-security corruption trial',
+      wallTop: '#170713', wallMid: '#47151d', floor: '#10060a', carpet: '#741622',
+      accent: '#ff5656', light: '#ffd3a0', bench: '#402018', desk: '#2c1212',
+      audience: 'security and media', props: 'storm windows, file crates, guards'
+    }
+  };
+
+  var PATTERN_RULES = {
+    standardTrial: {
+      name: 'Standard Trial',
+      hint: 'Balanced record. Evidence, pressure, and closing all matter.',
+      winPath: 'Evidence or closing',
+      eventRate: 0.11,
+      eventGap: 4
+    },
+    hostileWitness: {
+      name: 'Hostile Witness',
+      hint: 'The witness resists pressure. Build foundation before big attacks.',
+      winPath: 'Pressure or foundation',
+      eventRate: 0.16,
+      eventGap: 3,
+      witnessBoost: 18
+    },
+    evidenceSuppression: {
+      name: 'Evidence Suppression',
+      hint: 'Key proof may be challenged. Lay foundation and watch for late documents.',
+      winPath: 'Evidence timing',
+      eventRate: 0.14,
+      eventGap: 4,
+      requireFoundation: true
+    },
+    trapCase: {
+      name: 'Trap Case',
+      hint: 'Some obvious moves are bait. Reveal the weakness before striking.',
+      winPath: 'Trap avoidance',
+      eventRate: 0.13,
+      eventGap: 4,
+      trapSensitive: true
+    },
+    contradictionChain: {
+      name: 'Contradiction Chain',
+      hint: 'Break statements in sequence to make the final contradiction land.',
+      winPath: 'Chain contradictions',
+      eventRate: 0.12,
+      eventGap: 4,
+      sequenceSensitive: true
+    },
+    mediaPressure: {
+      name: 'Media Pressure',
+      hint: 'The gallery reacts loudly. Dramatic wins sway the jury; mistakes echo.',
+      winPath: 'Jury trust',
+      eventRate: 0.2,
+      eventGap: 3,
+      jurySwing: 1.25
+    },
+    mediaTrial: {
+      name: 'Media Trial',
+      hint: 'The gallery reacts loudly. Dramatic wins sway the jury; mistakes echo.',
+      winPath: 'Jury trust',
+      eventRate: 0.2,
+      eventGap: 3,
+      jurySwing: 1.25
+    },
+    judgePressure: {
+      name: 'Judge Pressure',
+      hint: 'The judge is impatient. Procedural mistakes are expensive.',
+      winPath: 'Clean procedure',
+      eventRate: 0.12,
+      eventGap: 3,
+      judgeStrictness: 1.35
+    },
+    surpriseWitness: {
+      name: 'Surprise Witness',
+      hint: 'Expect an interruption or a new statement mid-trial.',
+      winPath: 'Adaptation',
+      eventRate: 0.2,
+      eventGap: 3,
+      surprise: true
+    },
+    proceduralBattle: {
+      name: 'Procedural Battle',
+      hint: 'Technical proof needs foundation. Wrong objections cost patience.',
+      winPath: 'Foundation and objections',
+      eventRate: 0.11,
+      eventGap: 3,
+      requireFoundation: true,
+      judgeStrictness: 1.45
+    },
+    emotionalAppeal: {
+      name: 'Emotional Appeal',
+      hint: 'Emotional testimony moves the jury. Ground the room in proof.',
+      winPath: 'Jury trust',
+      eventRate: 0.18,
+      eventGap: 3,
+      jurySwing: 1.2
+    }
+  };
+
+  var CATEGORY_SCENES = {
+    financial: 'corporateTribunal',
+    corporate: 'corporateTribunal',
+    cyber: 'corporateTribunal',
+    intellectual_property: 'fashionTribunal',
+    fashion: 'fashionTribunal',
+    defamation: 'mediaCourtroom',
+    scandal: 'mediaCourtroom',
+    whistleblower: 'mediaCourtroom',
+    misconduct: 'smallCityCourt',
+    insurance: 'smallCityCourt',
+    estate: 'privateArbitrationRoom',
+    partnership: 'privateArbitrationRoom',
+    theft: 'grandAppealsCourt',
+    fraud: 'grandAppealsCourt',
+    corruption: 'corruptionFinalCourt',
+    political: 'corruptionFinalCourt',
+    witness_intimidation: 'emergencyNightHearing',
+    emergency: 'emergencyNightHearing'
+  };
+
+  var CATEGORY_DIALOGUE = {
+    financial: {
+      correct: [
+        'The audit trail does not match the timestamp on that transfer.',
+        'The ledger creates a paper trail the witness cannot outrun.'
+      ],
+      wrong: [
+        'That document may matter later, but it does not prove this point yet.',
+        'The court needs a cleaner link between the entry and the testimony.'
+      ]
+    },
+    fashion: {
+      correct: [
+        'The sketch registration predates the contract by six days.',
+        'The pattern board and the redline draft tell the same story.'
+      ],
+      wrong: [
+        'Style is not proof by itself. Anchor it to a dated record.',
+        'The judge wants authorship, not atmosphere.'
+      ]
+    },
+    intellectual_property: {
+      correct: [
+        'The sketch registration predates the contract by six days.',
+        'The creative timeline finally has a timestamp.'
+      ],
+      wrong: [
+        'Similarity alone is not enough. Establish access or timing first.',
+        'The court needs more than resemblance.'
+      ]
+    },
+    misconduct: {
+      correct: [
+        'The badge log breaks the officer timeline cleanly.',
+        'Procedure is the story, and the procedure does not support the witness.'
+      ],
+      wrong: [
+        'The court will not infer misconduct from a loose exhibit.',
+        'Tie the record to the stop before pressing this point.'
+      ]
+    },
+    corruption: {
+      correct: [
+        'The money trail and the calendar finally meet.',
+        'That filing turns influence into a transaction.'
+      ],
+      wrong: [
+        'Suspicion is not corruption. The court needs the exchange.',
+        'That point is dramatic, but the foundation is thin.'
+      ]
+    },
+    default: {
+      correct: [
+        'The record contradicts the testimony in plain language.',
+        'That exhibit gives the court a clearer truth than the witness did.'
+      ],
+      wrong: [
+        'The judge needs a clearer link before that exhibit can land.',
+        'The witness dodges because the foundation is not tight enough.'
+      ]
+    }
+  };
+
+  var EXTRA_CASES_V3 = [
+    {
+      id: 'disappearing_witness',
+      title: 'The Disappearing Witness',
+      category: 'witness_intimidation',
+      summary: 'A witness vanished after signing a statement and reappears with a different story.',
+      intro: 'A warehouse employee who once cleared your client has returned to court terrified and contradictory.',
+      motive: 'A logistics contractor needed the original statement buried.',
+      sceneTheme: 'emergencyNightHearing',
+      trialPattern: 'surpriseWitness',
+      twist: 'A second statement arrives during trial.',
+      opponent: { name: 'Kara Mott', personality: 'intimidating', tieColor: '#50161b', hairColor: '#2a1810' },
+      witness: { name: 'N. Ivers', role: 'Missing Eyewitness', mood: 'scared' },
+      evidencePool: ['witness_statement','phone_record','security_footage','access_badge_log','email_thread','timeline_contradiction'],
+      statements: [
+        { text: 'I never signed the earlier statement clearing the defendant.', weakness: 'witness_statement', obj: null, hint: 'The signature and notary seal match the original statement.', type: 'partial_lie' },
+        { text: 'Nobody contacted me after I left the warehouse.', weakness: 'phone_record', obj: null, hint: 'Phone records show six calls from a blocked contractor line.', type: 'fact' },
+        { text: 'I left before the loading bay incident happened.', weakness: 'access_badge_log', obj: null, hint: 'The badge log places the witness inside during the incident.', type: 'alibi' },
+        { text: 'There was no camera angle showing the bay door that night.', weakness: 'security_footage', obj: null, hint: 'Recovered footage shows the witness watching the exchange.', type: 'technical' },
+        { text: 'My memory changed after I reviewed my notes alone.', weakness: 'email_thread', obj: 'hearsay', hint: 'An email instructs the witness to use that exact phrase.', type: 'trap' },
+        { text: 'I am certain now: your client was the person I saw.', weakness: 'timeline_contradiction', obj: null, hint: 'The timeline makes that identification impossible.', type: 'final_contradiction' }
+      ],
+      caseDialogue: {
+        correct: ['That earlier statement did not disappear. It was buried.', 'The timeline puts fear in the witness box, not truth.'],
+        wrong: ['The witness is scared, but fear is not yet a contradiction.']
+      },
+      reward: { money: 6200, reputation: 24 }
+    },
+    {
+      id: 'bribed_juror',
+      title: 'The Bribed Juror Suspicion',
+      category: 'corruption',
+      summary: 'A juror is accused of taking money before deliberations even begin.',
+      intro: 'The court is investigating whether a civil verdict was poisoned before the first witness took the stand.',
+      motive: 'A shell donor needed one vote steered.',
+      sceneTheme: 'corruptionFinalCourt',
+      trialPattern: 'judgePressure',
+      twist: 'The judge will not tolerate speculation about the jury.',
+      opponent: { name: 'Special Counsel Rane', personality: 'technical', tieColor: '#202020', hairColor: '#c8b890' },
+      witness: { name: 'M. Bell', role: 'Court Clerk', mood: 'guarded' },
+      evidencePool: ['financial_ledger','phone_record','access_badge_log','calendar_invite','settlement_draft','witness_statement'],
+      statements: [
+        { text: 'No juror had private contact with either party.', weakness: 'phone_record', obj: null, hint: 'A juror phone pinged the claimant consultant twice.', type: 'technical' },
+        { text: 'The envelope was routine court mail.', weakness: 'financial_ledger', obj: null, hint: 'The ledger shows a matching cash withdrawal that morning.', type: 'fact' },
+        { text: 'The consultant never entered the restricted corridor.', weakness: 'access_badge_log', obj: null, hint: 'Badge logs show a guest pass in the corridor.', type: 'alibi' },
+        { text: 'The clerk calendar had no unusual meetings.', weakness: 'calendar_invite', obj: null, hint: 'A sealed calendar invite names the consultant.', type: 'misleading' },
+        { text: 'The settlement draft was created after deliberations.', weakness: 'settlement_draft', obj: null, hint: 'Metadata places the draft before jury selection.', type: 'technical' },
+        { text: 'Any claim of jury contact is reckless speculation.', weakness: 'witness_statement', obj: 'speculation', hint: 'A sworn hallway witness saw the exchange.', type: 'final_contradiction' }
+      ],
+      reward: { money: 9000, reputation: 34 }
+    },
+    {
+      id: 'luxury_suit_hidden_evidence',
+      title: 'The Lining of the Luxury Suit',
+      category: 'fashion',
+      summary: 'A custom suit hides the missing document that can clear your client.',
+      intro: 'A luxury tailor is accused of helping smuggle a contract amendment inside a jacket lining.',
+      motive: 'A rival wanted the original amendment lost in plain sight.',
+      sceneTheme: 'fashionTribunal',
+      trialPattern: 'trapCase',
+      twist: 'The cuff and lining matter more than the witness wants to admit.',
+      opponent: { name: 'Counsel Mirelle', personality: 'charming', tieColor: '#9b326e', hairColor: '#e0c090' },
+      witness: { name: 'O. Sato', role: 'Master Tailor', mood: 'defensive' },
+      evidencePool: ['redline_draft','signed_contract','security_footage','witness_statement','calendar_invite','phone_record'],
+      statements: [
+        { text: 'The suit was delivered sealed and untouched.', weakness: 'security_footage', obj: null, hint: 'Footage shows the lining opened in the fitting room.', type: 'technical' },
+        { text: 'There was no hidden compartment in that garment.', weakness: 'witness_statement', obj: null, hint: 'The apprentice described the secret pocket in detail.', type: 'partial_lie' },
+        { text: 'The contract amendment was never in my shop.', weakness: 'redline_draft', obj: null, hint: 'The redline draft has tailor chalk residue on the fold.', type: 'fact' },
+        { text: 'The final signed contract contains every agreed term.', weakness: 'signed_contract', obj: null, hint: 'The signed version lacks the amendment hidden in the lining.', type: 'misleading' },
+        { text: 'The client never returned after the first fitting.', weakness: 'calendar_invite', obj: null, hint: 'A second fitting invite exists the night before filing.', type: 'trap' },
+        { text: 'A cufflink proves nothing about who handled the contract.', weakness: 'phone_record', obj: 'relevance', hint: 'The call log places the witness with the rival moments after the cufflink was found.', type: 'final_contradiction' }
+      ],
+      reward: { money: 6800, reputation: 26 }
+    },
+    {
+      id: 'tailor_shop_alibi',
+      title: 'The Tailor Shop Alibi',
+      category: 'fashion',
+      summary: 'A precise fitting appointment may clear a client accused of sabotage.',
+      intro: 'Your client claims a tailor shop appointment proves they could not have entered a rival studio.',
+      motive: 'A rival designer needed the alibi discredited.',
+      sceneTheme: 'fashionTribunal',
+      trialPattern: 'contradictionChain',
+      twist: 'The alibi depends on a cufflink, a receipt, and a camera reflection.',
+      opponent: { name: 'Vera Koll', personality: 'slippery', tieColor: '#6a3aaa', hairColor: '#2a1810' },
+      witness: { name: 'L. Armand', role: 'Tailor', mood: 'nervous' },
+      evidencePool: ['calendar_invite','security_footage','phone_record','witness_statement','financial_ledger','redline_draft'],
+      statements: [
+        { text: 'The fitting ended before eight, leaving plenty of time to reach the studio.', weakness: 'calendar_invite', obj: null, hint: 'The appointment ran until 8:42 PM.', type: 'alibi' },
+        { text: 'The hallway camera never captured your client in the shop.', weakness: 'security_footage', obj: null, hint: 'The mirror reflection captures the client in frame.', type: 'technical' },
+        { text: 'I cannot identify the owner of the cufflink found near the studio.', weakness: 'witness_statement', obj: null, hint: 'The tailor statement identifies the cufflink as a rival sample.', type: 'partial_lie' },
+        { text: 'No payment was recorded for a late fitting.', weakness: 'financial_ledger', obj: null, hint: 'The ledger lists a rush alteration fee.', type: 'misleading' },
+        { text: 'There were no calls from the shop after closing.', weakness: 'phone_record', obj: null, hint: 'The shop called the client at 8:51 PM.', type: 'trap' },
+        { text: 'The redline sketch proves the design was already public.', weakness: 'redline_draft', obj: 'relevance', hint: 'The redline was created after the alleged theft.', type: 'final_contradiction' }
+      ],
+      reward: { money: 5600, reputation: 22 }
+    },
+    {
+      id: 'hacked_security_footage',
+      title: 'The Hacked Security Footage',
+      category: 'cyber',
+      summary: 'A security video was altered before the company handed it to police.',
+      intro: 'Your client is visible on footage that may have been generated from corrupted security logs.',
+      motive: 'An internal saboteur needed a perfect digital scapegoat.',
+      sceneTheme: 'corporateTribunal',
+      trialPattern: 'proceduralBattle',
+      twist: 'Technical statements require foundation before evidence can land.',
+      opponent: { name: 'Nadia Pike', personality: 'technical', tieColor: '#1a4a66', hairColor: '#d0c8b8' },
+      witness: { name: 'R. Lin', role: 'Security Engineer', mood: 'overconfident' },
+      evidencePool: ['security_footage','expert_report','access_badge_log','internal_memo','phone_record','timeline_contradiction'],
+      statements: [
+        { text: 'The timestamp is generated by hardware and cannot be altered.', weakness: 'expert_report', obj: null, hint: 'The expert report shows a firmware-level timestamp flaw.', type: 'technical' },
+        { text: 'The badge log confirms the person in the video entered legally.', weakness: 'access_badge_log', obj: null, hint: 'The badge log was imported six hours after the footage.', type: 'technical' },
+        { text: 'No internal memo flagged security problems before the incident.', weakness: 'internal_memo', obj: null, hint: 'The memo warned that camera exports could be spoofed.', type: 'partial_lie' },
+        { text: 'The phone record is irrelevant to video authenticity.', weakness: 'phone_record', obj: 'relevance', hint: 'The phone was miles away while the video shows the client onsite.', type: 'trap' },
+        { text: 'The clip sequence is continuous from entry to exit.', weakness: 'security_footage', obj: null, hint: 'The footage jumps exactly three frames at the door.', type: 'misleading' },
+        { text: 'The timeline is consistent with every digital record we have.', weakness: 'timeline_contradiction', obj: null, hint: 'The exported timeline contradicts the server backup.', type: 'final_contradiction' }
+      ],
+      reward: { money: 8200, reputation: 32 }
+    },
+    {
+      id: 'political_scandal',
+      title: 'The Waterfront Scandal',
+      category: 'political',
+      summary: 'A mayoral campaign donor appears inside a rezoning deal.',
+      intro: 'A waterfront rezoning vote becomes a public scandal when donor records and private calendars collide.',
+      motive: 'A campaign needed a legal cover story for a favor.',
+      sceneTheme: 'mediaCourtroom',
+      trialPattern: 'mediaPressure',
+      twist: 'Media leaks swing the jury hard.',
+      opponent: { name: 'Atty. Halden', personality: 'charming', tieColor: '#0a3f5f', hairColor: '#c8a060' },
+      witness: { name: 'J. Vale', role: 'Campaign Treasurer', mood: 'guarded' },
+      evidencePool: ['financial_ledger','calendar_invite','email_thread','phone_record','board_minutes','settlement_draft'],
+      statements: [
+        { text: 'The donor meeting was unrelated to the rezoning vote.', weakness: 'calendar_invite', obj: null, hint: 'The invite title names the waterfront vote.', type: 'misleading' },
+        { text: 'Campaign funds never touched the project committee.', weakness: 'financial_ledger', obj: null, hint: 'The ledger records a pass-through payment.', type: 'technical' },
+        { text: 'No one discussed favorable treatment in writing.', weakness: 'email_thread', obj: 'hearsay', hint: 'The email thread says "deliver the vote by Friday."', type: 'partial_lie' },
+        { text: 'The board minutes show unanimous independent support.', weakness: 'board_minutes', obj: null, hint: 'The minutes were revised after the donor meeting.', type: 'fact' },
+        { text: 'The settlement draft was only a campaign compliance document.', weakness: 'settlement_draft', obj: 'relevance', hint: 'The draft contains a confidentiality clause for zoning discussions.', type: 'trap' },
+        { text: 'There were no calls between the donor and campaign staff.', weakness: 'phone_record', obj: null, hint: 'Phone records show calls before and after the vote.', type: 'final_contradiction' }
+      ],
+      reward: { money: 10500, reputation: 40 }
+    },
+    {
+      id: 'rival_law_firm_conspiracy',
+      title: 'The Rival Firm Conspiracy',
+      category: 'partnership',
+      summary: 'A competing law firm may have manufactured a conflict to steal a client.',
+      intro: 'Your firm is accused of conflict violations, but the record points to a rival firm engineering the crisis.',
+      motive: 'A rival partner wanted a lucrative client book.',
+      sceneTheme: 'privateArbitrationRoom',
+      trialPattern: 'contradictionChain',
+      twist: 'The conspiracy emerges only after multiple contradictions are chained.',
+      opponent: { name: 'Grace Thorne', personality: 'slippery', tieColor: '#1a1a4a', hairColor: '#e8e0d0' },
+      witness: { name: 'C. Morrow', role: 'Ethics Consultant', mood: 'defensive' },
+      evidencePool: ['email_thread','board_minutes','nda_clause','phone_record','settlement_draft','calendar_invite'],
+      statements: [
+        { text: 'The conflict memo came from an independent ethics review.', weakness: 'email_thread', obj: null, hint: 'The email thread shows the rival firm drafted it.', type: 'partial_lie' },
+        { text: 'No board member discussed moving the client before the memo.', weakness: 'board_minutes', obj: null, hint: 'Board minutes show a client transfer strategy.', type: 'misleading' },
+        { text: 'The NDA prevents disclosure of the consultant source.', weakness: 'nda_clause', obj: 'relevance', hint: 'The NDA excludes misconduct and fraud.', type: 'trap' },
+        { text: 'No phone calls connected me to the rival partner.', weakness: 'phone_record', obj: null, hint: 'Phone logs show five calls in two days.', type: 'technical' },
+        { text: 'The settlement draft was a routine risk-control document.', weakness: 'settlement_draft', obj: null, hint: 'The draft offers payment for silence about the client transfer.', type: 'fact' },
+        { text: 'The calendar proves I was not present at the strategy meeting.', weakness: 'calendar_invite', obj: null, hint: 'The invite lists the witness as remote attendee.', type: 'final_contradiction' }
+      ],
+      reward: { money: 11500, reputation: 38 }
+    },
+    {
+      id: 'poisoned_contract',
+      title: 'The Poisoned Contract Negotiation',
+      category: 'fraud',
+      summary: 'A settlement contract contains a clause designed to destroy the client later.',
+      intro: 'A negotiation that looked generous concealed a clause that would trigger automatic default.',
+      motive: 'Opposing counsel needed a settlement that looked fair and failed later.',
+      sceneTheme: 'privateArbitrationRoom',
+      trialPattern: 'trapCase',
+      twist: 'The wrong exhibit gives the opponent exactly the opening they want.',
+      opponent: { name: 'M. Sable', personality: 'technical', tieColor: '#32233f', hairColor: '#c8c0b0' },
+      witness: { name: 'E. Rowan', role: 'Deal Counsel', mood: 'composed' },
+      evidencePool: ['signed_contract','redline_draft','email_thread','settlement_draft','phone_record','internal_memo'],
+      statements: [
+        { text: 'The default clause was standard boilerplate.', weakness: 'redline_draft', obj: null, hint: 'The redline shows the clause added after business approval.', type: 'technical' },
+        { text: 'Your client accepted every term voluntarily.', weakness: 'email_thread', obj: null, hint: 'Emails show pressure to sign before counsel reviewed the draft.', type: 'misleading' },
+        { text: 'The signed contract reflects the final negotiated position.', weakness: 'signed_contract', obj: null, hint: 'The signed page references an exhibit that was swapped.', type: 'fact' },
+        { text: 'The settlement draft was more favorable than litigation.', weakness: 'settlement_draft', obj: 'relevance', hint: 'The draft contained a hidden acceleration trigger.', type: 'trap' },
+        { text: 'No one called your client after business hours.', weakness: 'phone_record', obj: null, hint: 'Phone records show a midnight pressure call.', type: 'partial_lie' },
+        { text: 'The internal memo proves we disclosed all risks.', weakness: 'internal_memo', obj: null, hint: 'The memo says the default clause was intentionally buried.', type: 'final_contradiction' }
+      ],
+      reward: { money: 9700, reputation: 36 }
+    },
+    {
+      id: 'witness_intimidation',
+      title: 'The Quiet Hallway Threat',
+      category: 'witness_intimidation',
+      summary: 'A witness changed testimony after a hallway meeting no one wants to discuss.',
+      intro: 'A hallway camera, a phone call, and a sudden memory lapse point toward witness intimidation.',
+      motive: 'The prosecution witness was pressured to protect a superior.',
+      sceneTheme: 'emergencyNightHearing',
+      trialPattern: 'hostileWitness',
+      twist: 'Pressure can work, but only after the contradiction is visible.',
+      opponent: { name: 'D. Crowe', personality: 'intimidating', tieColor: '#4a0000', hairColor: '#3a3a3a' },
+      witness: { name: 'P. Ren', role: 'Former Assistant', mood: 'scared' },
+      evidencePool: ['security_footage','phone_record','witness_statement','email_thread','access_badge_log','timeline_contradiction'],
+      statements: [
+        { text: 'No one spoke to me in the hallway before testimony.', weakness: 'security_footage', obj: null, hint: 'The footage shows a hallway confrontation.', type: 'partial_lie' },
+        { text: 'I changed my statement because I remembered new details.', weakness: 'witness_statement', obj: null, hint: 'The prior statement was clear and sworn.', type: 'misleading' },
+        { text: 'The phone call after the meeting was personal.', weakness: 'phone_record', obj: null, hint: 'The call was to opposing counsel.', type: 'technical' },
+        { text: 'No badge record places me near the restricted wing.', weakness: 'access_badge_log', obj: null, hint: 'The badge log places the witness outside counsel rooms.', type: 'alibi' },
+        { text: 'There was no written pressure from my employer.', weakness: 'email_thread', obj: 'hearsay', hint: 'The email says "correct the story before court."', type: 'trap' },
+        { text: 'My revised timeline is the accurate one.', weakness: 'timeline_contradiction', obj: null, hint: 'The revised timeline contradicts the security footage.', type: 'final_contradiction' }
+      ],
+      reward: { money: 7300, reputation: 30 }
+    },
+    {
+      id: 'corrupted_judge_final',
+      title: 'The Corrupted Judge',
+      category: 'corruption',
+      summary: 'A final case alleges the presiding judge in a prior matter was compromised.',
+      intro: 'A sealed disciplinary file suggests a judge, a donor, and a verdict were connected before trial began.',
+      motive: 'A political machine needed a guaranteed verdict.',
+      sceneTheme: 'corruptionFinalCourt',
+      trialPattern: 'proceduralBattle',
+      twist: 'Every accusation must be perfectly founded or the court will shut it down.',
+      opponent: { name: 'Chief Counsel Voss', personality: 'technical', tieColor: '#0b0b0b', hairColor: '#c8b888' },
+      witness: { name: 'Clerk Edda Vale', role: 'Judicial Clerk', mood: 'guarded' },
+      evidencePool: ['financial_ledger','calendar_invite','phone_record','internal_memo','board_minutes','settlement_draft','whistle_file'],
+      statements: [
+        { text: 'The judge had no financial contact with any party.', weakness: 'financial_ledger', obj: null, hint: 'The ledger shows a donor-advised payment routed to a family trust.', type: 'technical' },
+        { text: 'The calendar meeting was a routine bar association event.', weakness: 'calendar_invite', obj: null, hint: 'The invite lists the donor and case number.', type: 'technical' },
+        { text: 'No calls occurred between chambers and campaign staff.', weakness: 'phone_record', obj: null, hint: 'Phone records show calls the night before ruling.', type: 'partial_lie' },
+        { text: 'The internal memo cleared the judge of any conflict.', weakness: 'internal_memo', obj: null, hint: 'The memo recommended recusal before it was edited.', type: 'misleading' },
+        { text: 'Board minutes from the donor group are irrelevant.', weakness: 'board_minutes', obj: 'relevance', hint: 'The minutes discuss expected court timing.', type: 'trap' },
+        { text: 'There was never a settlement offer tied to the ruling.', weakness: 'settlement_draft', obj: null, hint: 'The draft references ruling language before it was issued.', type: 'fact' },
+        { text: 'The whistleblower file is rumor, not evidence.', weakness: 'whistle_file', obj: null, hint: 'The file contains documents only chambers could possess.', type: 'final_contradiction' }
+      ],
+      reward: { money: 18000, reputation: 70 }
+    }
+  ];
+
+  function cloneData(obj) {
+    return JSON.parse(JSON.stringify(obj));
+  }
+
+  function pick(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  function normalizePatternName(value, category, title) {
+    var v = value || '';
+    if (v === 'mediaTrial') return 'mediaPressure';
+    if (v && PATTERN_RULES[v]) return v;
+    if (/judge|procedural/i.test(v)) return 'proceduralBattle';
+    if (/trap/i.test(v)) return 'trapCase';
+    if (/chain/i.test(v)) return 'contradictionChain';
+    if (/witness/i.test(v)) return 'hostileWitness';
+    if (/media|scandal|whistle/i.test(category || title || '')) return 'mediaPressure';
+    if (/corruption|political/i.test(category || title || '')) return 'judgePressure';
+    if (/estate|partnership/i.test(category || '')) return 'contradictionChain';
+    return 'standardTrial';
+  }
+
+  function inferCategory(c) {
+    if (c.category) return c.category;
+    var text = ((c.title || '') + ' ' + (c.intro || '')).toLowerCase();
+    if (/ledger|finance|account|audit|money|transfer/.test(text)) return 'financial';
+    if (/fashion|sketch|tailor|design|suit/.test(text)) return 'fashion';
+    if (/security|server|hacked|malware|cyber/.test(text)) return 'cyber';
+    if (/mayor|judge|bribe|corrupt|donor|juror/.test(text)) return 'corruption';
+    if (/witness|threat|intimidat/.test(text)) return 'witness_intimidation';
+    if (/estate|will|inheritance/.test(text)) return 'estate';
+    if (/theft|gallery|painting|art/.test(text)) return 'theft';
+    if (/insurance|claim|fire/.test(text)) return 'insurance';
+    if (/arrest|officer|precinct|misconduct/.test(text)) return 'misconduct';
+    return 'fraud';
+  }
+
+  function inferScene(c) {
+    if (c.sceneTheme && SCENE_THEMES[c.sceneTheme]) return c.sceneTheme;
+    if (c.courtScene && SCENE_THEMES[c.courtScene]) return c.courtScene;
+    if (c.venueType && SCENE_THEMES[c.venueType]) return c.venueType;
+    var category = inferCategory(c);
+    var title = (c.title || '').toLowerCase();
+    if (/final|judge|corrupt|mayor|bribed/.test(title)) return 'corruptionFinalCourt';
+    if (/midnight|night|missing witness|threat/.test(title)) return 'emergencyNightHearing';
+    if (/fashion|tailor|sketch|suit/.test(title)) return 'fashionTribunal';
+    return CATEGORY_SCENES[category] || (c.diff >= 5 ? 'grandAppealsCourt' : 'smallCityCourt');
+  }
+
+  function normalizeStatement(stmt, idx, total) {
+    if (!stmt.type) {
+      if (idx === total - 1) stmt.type = 'final_contradiction';
+      else if (stmt.obj) stmt.type = stmt.obj === 'relevance' ? 'emotional' : 'trap';
+      else if (/timeline|alibi|away|present|entered|left/i.test(stmt.text || '')) stmt.type = 'alibi';
+      else if (/expert|data|record|log|timestamp|metadata|ledger|technical/i.test(stmt.text || '')) stmt.type = 'technical';
+      else stmt.type = 'fact';
+    }
+    stmt.statementType = stmt.type;
+    return stmt;
+  }
+
+  function normalizeCase(c) {
+    if (!c) return c;
+    c.category = inferCategory(c);
+    c.diff = Math.max(1, Math.min(6, Number(c.diff) || (
+      /corruption|political/.test(c.category) ? 4 :
+      /cyber|partnership|witness_intimidation/.test(c.category) ? 3 : 2
+    )));
+    c.summary = c.summary || c.intro || c.title || 'A courtroom dispute.';
+    c.sceneTheme = inferScene(c);
+    c.courtScene = c.sceneTheme;
+    c.venueType = c.sceneTheme;
+    c.trialPattern = normalizePatternName(c.trialPattern || c.courtPattern || c.sequenceType || c.pattern, c.category, c.title);
+    c.courtPattern = c.trialPattern;
+    c.sequenceType = c.trialPattern;
+    c.pattern = c.trialPattern;
+    if (typeof c.reward === 'number') {
+      c.reward = { money: c.reward, reputation: Math.max(8, Math.round((c.diff || 1) * 8)) };
+    } else if (c.reward) {
+      c.reward.money = c.reward.money || c.reward.cash || 2500 + (c.diff || 1) * 900;
+      c.reward.reputation = c.reward.reputation || c.reward.rep || Math.max(8, Math.round((c.diff || 1) * 8));
+    } else {
+      c.reward = { money: 2500 + (c.diff || 1) * 900, reputation: Math.max(8, Math.round((c.diff || 1) * 8)) };
+    }
+    if (Array.isArray(c.statements)) {
+      c.statements.forEach(function(stmt, idx) { normalizeStatement(stmt, idx, c.statements.length); });
+    }
+    if (!c.caseDialogue) {
+      var pool = CATEGORY_DIALOGUE[c.category] || CATEGORY_DIALOGUE.default;
+      c.caseDialogue = { correct: pool.correct.slice(), wrong: pool.wrong.slice() };
+    }
+    return c;
+  }
+
+  function installCaseData() {
+    if (typeof CASES === 'undefined') return;
+    var existing = {};
+    CASES.forEach(function(c) { existing[(c.title || '').toLowerCase()] = true; normalizeCase(c); });
+    EXTRA_CASES_V3.forEach(function(c) {
+      if (!existing[(c.title || '').toLowerCase()]) {
+        CASES.push(normalizeCase(cloneData(c)));
+      }
+    });
+    CASES.forEach(normalizeCase);
+  }
+
+  installCaseData();
+
+  var CAMPAIGN_BASE_V3 = (typeof CASES !== 'undefined') ? CASES.map(function(c) { return normalizeCase(c); }) : [];
+
+  function refreshMenuCaseCount() {
+    if (typeof CASES === 'undefined') return;
+    var dossier = document.querySelector('.menu-dossier');
+    if (!dossier) return;
+    var nodes = Array.prototype.slice.call(dossier.querySelectorAll('div'));
+    var stat = nodes.find(function(n) { return /cases on the docket/i.test(n.textContent || ''); });
+    if (!stat) {
+      stat = document.createElement('div');
+      stat.style.cssText = 'margin-top:10px;font-size:11px;color:var(--ink-dim);letter-spacing:1.5px;text-transform:uppercase;';
+      dossier.appendChild(stat);
+    }
+    stat.textContent = 'CASE FILES: ' + CASES.length + ' cases on the docket - ' +
+      new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  }
+
+  setTimeout(refreshMenuCaseCount, 0);
+
+  function shuffleV3(arr) {
+    var out = arr.slice();
+    for (var i = out.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = out[i];
+      out[i] = out[j];
+      out[j] = tmp;
+    }
+    return out;
+  }
+
+  function rebuildFullCampaignDeck() {
+    if (typeof CASES === 'undefined' || !CAMPAIGN_BASE_V3.length) return;
+    var deck = shuffleV3(CAMPAIGN_BASE_V3.map(function(c) { return normalizeCase(cloneData(c)); }));
+    var bonusCount = 2 + Math.floor(Math.random() * 3);
+    for (var i = 0; i < bonusCount; i++) deck.push(Game.makeRandomCase());
+    CASES.length = 0;
+    deck.forEach(function(c) { CASES.push(normalizeCase(c)); });
+    try { if (typeof I18N !== 'undefined' && I18N.translateData) I18N.translateData(); } catch(e) {}
+  }
+
+  Game.startCampaign = function() {
+    var hasSave = false;
+    try { hasSave = !!localStorage.getItem('ops_save'); } catch(e) {}
+    if (hasSave && !window.__opsConfirmedNew) {
+      var msg = (typeof I18N !== 'undefined' && I18N.ar && I18N.ar())
+        ? 'لديك مسيرة محفوظة. هل تريد بدء مسيرة جديدة؟'
+        : 'You have a saved career. Start a NEW career?';
+      if (!window.confirm(msg)) return;
+    }
+    window.__opsConfirmedNew = true;
+    setTimeout(function() { window.__opsConfirmedNew = false; }, 100);
+    rebuildFullCampaignDeck();
+    S.campaignIndex = 0;
+    S.randomMode = false;
+    S.styleSelection = { current: null, name: '' };
+    this.buildStyleSelect();
+    UI.switchTo('style');
+  };
+
+  var _origStartCaseV3 = Game.startCase && Game.startCase.bind(Game);
+  if (_origStartCaseV3) {
+    Game.startCase = function(idx) {
+      if (typeof CASES !== 'undefined' && CASES[idx]) normalizeCase(CASES[idx]);
+      return _origStartCaseV3.apply(this, arguments);
+    };
+  }
+
+  var _origMakeRandomV3 = Game.makeRandomCase && Game.makeRandomCase.bind(Game);
+  Game.makeRandomCase = function() {
+    var pool = (typeof CASES !== 'undefined' && CASES.length ? CASES : EXTRA_CASES_V3).filter(function(c) {
+      return c && c.statements && c.evidencePool;
+    });
+    var base = cloneData(pool[Math.floor(Math.random() * pool.length)] || (_origMakeRandomV3 ? _origMakeRandomV3() : EXTRA_CASES_V3[0]));
+    base.id = 'random_' + Date.now() + '_' + Math.floor(Math.random() * 9999);
+    base.title = 'Random Docket: ' + base.title;
+    base.randomMode = true;
+    base.diff = Math.max(1, Math.min(6, (base.diff || 2) + Math.floor(Math.random() * 3) - 1));
+    base.reward = { money: 3600 + base.diff * 2100, reputation: 12 + base.diff * 8 };
+    base.opponent = cloneData(base.opponent || { name: 'A. Vale', personality: 'technical', tieColor: '#333', hairColor: '#bbb' });
+    base.witness = cloneData(base.witness || { name: 'S. Arden', role: 'Key Witness', mood: 'nervous' });
+    base.statements = base.statements.slice().sort(function(a, b) {
+      if (a.type === 'final_contradiction') return 1;
+      if (b.type === 'final_contradiction') return -1;
+      return Math.random() - 0.5;
+    }).slice(0, Math.min(6, base.statements.length));
+    return normalizeCase(base);
+  };
+
+  Game.startDailyCase = function() {
+    if (!S.player) {
+      alert('Please start or continue a career before playing the daily case.');
+      return;
+    }
+    var now = new Date();
+    var seed = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+    var pool = (typeof CASES !== 'undefined' && CASES.length ? CASES : EXTRA_CASES_V3).filter(function(c) { return c && c.statements; });
+    var base = cloneData(pool[seed % pool.length]);
+    base.id = 'daily_' + seed;
+    base.title = 'Daily Docket: ' + base.title;
+    base.daily = true;
+    base.reward = { money: 4200 + (base.diff || 2) * 1800, reputation: 14 + (base.diff || 2) * 7 };
+    normalizeCase(base);
+    S.randomMode = true;
+    S.campaignIndex = 0;
+    S.caseData = base;
+    S.invest = { visited: {}, clues: [], left: 2, revealed: [] };
+    S.negot = null;
+    this.buildPrep();
+    UI.switchTo('office');
+    UI.refreshTopBar();
+  };
+
+  function patternRule(c) {
+    var name = normalizePatternName(c && (c.trialPattern || c.pattern), c && c.category, c && c.title);
+    return PATTERN_RULES[name] || PATTERN_RULES.standardTrial;
+  }
+
+  function applyTrialSequence(court, cd) {
+    var rule = patternRule(cd);
+    court.trialPattern = cd.trialPattern;
+    court._director = {
+      pattern: cd.trialPattern,
+      sceneTheme: cd.sceneTheme,
+      foundation: {},
+      eventBudget: 4 + Math.min(3, cd.diff || 1),
+      lastEventRound: 0,
+      firstObjection: false,
+      witnessBreak: false,
+      judgeWarning: false,
+      openingPlayed: false,
+      winPath: rule.winPath
+    };
+    court._pattern = {
+      name: rule.name,
+      hint: rule.hint,
+      eventRate: 0,
+      opponentBias: 0,
+      judgeStrictness: rule.judgeStrictness || 1
+    };
+    court._characterState = {
+      player: 'focused',
+      opp: 'confident',
+      witness: 'composed',
+      judge: 'neutral'
+    };
+    if (rule.witnessBoost) court.witnessConfidence = Math.min(130, court.witnessConfidence + rule.witnessBoost);
+    if (rule.judgeStrictness) court.judge = Math.max(55, Math.round(court.judge - (rule.judgeStrictness - 1) * 12));
+    if (rule.jurySwing && cd.trialPattern === 'emotionalAppeal') court.jury = Math.max(-50, court.jury - 5);
+    if (cd.trialPattern === 'contradictionChain') {
+      cd.statements.sort(function(a, b) {
+        var order = { fact: 0, alibi: 1, misleading: 2, partial_lie: 3, technical: 4, trap: 5, emotional: 5, final_contradiction: 9 };
+        return (order[a.type] || 4) - (order[b.type] || 4);
+      });
+    } else if (cd.trialPattern === 'trapCase') {
+      cd.statements.sort(function(a, b) {
+        if (a.type === 'final_contradiction') return 1;
+        if (b.type === 'final_contradiction') return -1;
+        if (a.type === 'trap' && b.type !== 'trap') return -1;
+        if (b.type === 'trap' && a.type !== 'trap') return 1;
+        return 0;
+      });
+    } else if (cd.trialPattern === 'emotionalAppeal' || cd.trialPattern === 'mediaPressure') {
+      cd.statements.sort(function(a, b) {
+        if (a.type === 'final_contradiction') return 1;
+        if (b.type === 'final_contradiction') return -1;
+        if (a.type === 'emotional' && b.type !== 'emotional') return -1;
+        if (b.type === 'emotional' && a.type !== 'emotional') return 1;
+        return 0;
+      });
+    }
+    court.statementsTotal = cd.statements.length;
+  }
+
+  var _origEnterCourtroomV3 = Game.enterCourtroom && Game.enterCourtroom.bind(Game);
+  if (_origEnterCourtroomV3) {
+    Game.enterCourtroom = function() {
+      if (S.caseData) normalizeCase(S.caseData);
+      var out = _origEnterCourtroomV3.apply(this, arguments);
+      if (S.court && S.caseData && S.court.mode === 'campaign') {
+        applyTrialSequence(S.court, S.caseData);
+        updateCourtChrome();
+        directorCutscene('Court Opens', sceneTitle(S.caseData.sceneTheme) + ' - ' + patternRule(S.caseData).name, 'drama', 1150);
+        try { this.renderCourt(); } catch(e) {}
+      }
+      return out;
+    };
+  }
+
+  function escapeHTML(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+    });
+  }
+
+  function sceneTitle(themeId) {
+    return (SCENE_THEMES[themeId] || SCENE_THEMES.classicCourtroom).name;
+  }
+
+  function directorCutscene(title, subtitle, type, duration) {
+    var overlay = document.getElementById('cutsceneOverlay');
+    if (!overlay) return;
+    var icon = document.getElementById('cutsceneIcon');
+    var ttl = document.getElementById('cutsceneTitle');
+    var sub = document.getElementById('cutsceneSubtitle');
+    if (icon) icon.textContent = type === 'lost' ? '!' : (type === 'witness' ? '...' : '*');
+    if (ttl) ttl.textContent = title;
+    if (sub) sub.textContent = subtitle || '';
+    overlay.className = overlay.className.replace(/type-\w+/g, '');
+    overlay.classList.remove('hidden');
+    overlay.classList.add('type-' + (type || 'drama'));
+    requestAnimationFrame(function() { overlay.classList.add('active'); });
+    setTimeout(function() {
+      overlay.classList.remove('active');
+      setTimeout(function() { overlay.classList.add('hidden'); }, 260);
+    }, duration || 1050);
+  }
+
+  function caseLine(kind, card, stmt) {
+    var cd = S.caseData || {};
+    var pool = cd.caseDialogue && cd.caseDialogue[kind === 'correct' ? 'correct' : 'wrong'];
+    if (!pool || !pool.length) {
+      var catPool = CATEGORY_DIALOGUE[cd.category] || CATEGORY_DIALOGUE.default;
+      pool = kind === 'correct' ? catPool.correct : catPool.wrong;
+    }
+    var line = pick(pool);
+    if (card && stmt && kind === 'correct' && /default|record/i.test(line)) {
+      line += ' ' + card.name + ' answers this testimony directly.';
+    }
+    return line;
+  }
+
+  function showEvidenceMoment(card, stmt, success, line) {
+    if (!card) return;
+    var old = document.querySelector('.evidence-moment');
+    if (old) old.remove();
+    var div = document.createElement('div');
+    div.className = 'evidence-moment ' + (success ? 'good' : 'bad');
+    div.innerHTML =
+      '<div class="evidence-moment-card">' +
+        '<div class="evidence-moment-title">' + escapeHTML(card.name || 'Evidence') + '</div>' +
+        '<div class="evidence-moment-desc">' + escapeHTML(card.desc || '') + '</div>' +
+        '<div class="evidence-moment-line">' + escapeHTML(line || caseLine(success ? 'correct' : 'wrong', card, stmt)) + '</div>' +
+      '</div>';
+    document.body.appendChild(div);
+    setTimeout(function() { if (div.parentNode) div.parentNode.removeChild(div); }, 1500);
+  }
+
+  function markFoundation(action) {
+    var c = S.court;
+    if (!c || !c._director) return;
+    var idx = c.statementIdx || 0;
+    c._director.foundation[idx] = Math.max(c._director.foundation[idx] || 0, action === 'cross' ? 2 : 1);
+  }
+
+  ['resolveCross', 'resolveReadRoom', 'resolvePinDown', 'resolveConsultNotes'].forEach(function(fn) {
+    if (!Game[fn]) return;
+    var orig = Game[fn].bind(Game);
+    Game[fn] = function() {
+      markFoundation(fn === 'resolveCross' ? 'cross' : 'support');
+      return orig.apply(this, arguments);
+    };
+  });
+
+  if (Game.pressWitness) {
+    var _origPressWitnessV3 = Game.pressWitness.bind(Game);
+    Game.pressWitness = function() {
+      markFoundation('cross');
+      return _origPressWitnessV3.apply(this, arguments);
+    };
+  }
+
+  function evidenceGate(c, stmt, card) {
+    if (!c || !c._director || !stmt || !card) return null;
+    var rule = PATTERN_RULES[c._director.pattern] || PATTERN_RULES.standardTrial;
+    var idx = c.statementIdx || 0;
+    var foundation = c._director.foundation[idx] || 0;
+    var isMatch = stmt.weakness === card.id;
+    if (isMatch && (rule.requireFoundation || stmt.type === 'technical') && stmt.type === 'technical' && foundation < 1) {
+      return {
+        reason: 'Foundation required',
+        message: 'Foundation not established. Cross-examine or consult notes before using technical proof.',
+        judge: 5,
+        cred: 4
+      };
+    }
+    if (isMatch && stmt.type === 'trap' && foundation < 1 && rule.trapSensitive) {
+      return {
+        reason: 'Trap not disarmed',
+        message: 'The opponent blocks the exhibit. Reveal the trap first, then use the evidence.',
+        judge: 7,
+        cred: 6
+      };
+    }
+    if (isMatch && stmt.type === 'final_contradiction' && c.statementsResolved < Math.max(1, Math.floor((S.caseData.statements.length || 5) * 0.45))) {
+      return {
+        reason: 'Too early',
+        message: 'The judge needs a clearer chain before the final contradiction can land.',
+        judge: 6,
+        cred: 5
+      };
+    }
+    return null;
+  }
+
+  var _origPresentEvidenceV3 = Game.presentEvidence && Game.presentEvidence.bind(Game);
+  if (_origPresentEvidenceV3) {
+    Game.presentEvidence = function(idx) {
+      var c = S.court;
+      var stmt = this.currentStatement && this.currentStatement();
+      var card = c && c.hand ? c.hand[idx] : null;
+      if (!c || !stmt || !card || card.used) return _origPresentEvidenceV3.apply(this, arguments);
+      var gate = evidenceGate(c, stmt, card);
+      if (gate) {
+        c.player.cred = Math.max(0, c.player.cred - gate.cred);
+        c.judge = Math.max(0, c.judge - gate.judge);
+        c.lastResult = 'bad';
+        c.lastSide = 'player';
+        setLiveState('player', 'pressured');
+        setLiveState('opp', 'smug');
+        setLiveState('judge', c.judge < 40 ? 'angry' : 'annoyed');
+        showEvidenceMoment(card, stmt, false, gate.message);
+        try { this.courtLog(gate.message + ' You keep the exhibit for later. Judge -' + gate.judge + ', cred -' + gate.cred + '.', 'bad'); } catch(e) {}
+        try { Snd.warning && Snd.warning(); } catch(e) {}
+        this.afterPlayerTurn(false);
+        return;
+      }
+      var success = stmt.weakness === card.id;
+      var boost = success && c._director && (c._director.foundation[c.statementIdx || 0] || 0) > 0;
+      var oldStrength = card.strength;
+      if (boost) card.strength = (card.strength || 0) + 3;
+      showEvidenceMoment(card, stmt, success, caseLine(success ? 'correct' : 'wrong', card, stmt));
+      setLiveState('player', success ? 'triumphant' : 'shocked');
+      setLiveState('opp', success ? 'rattled' : 'smug');
+      setLiveState('witness', success ? ((c.witnessConfidence || 100) < 35 ? 'panicking' : 'nervous') : 'defensive');
+      var out;
+      try {
+        out = _origPresentEvidenceV3.apply(this, arguments);
+      } finally {
+        card.strength = oldStrength;
+      }
+      if (success && boost) {
+        try { this.courtLog('Foundation paid off. The exhibit hits harder because the witness was already boxed in.', 'drama'); } catch(e) {}
+      }
+      return out;
+    };
+  }
+
+  var _origResolveObjectionV3 = Game.resolveObjection && Game.resolveObjection.bind(Game);
+  if (_origResolveObjectionV3) {
+    Game.resolveObjection = function(type) {
+      var c = S.court;
+      var stmt = this.currentStatement && this.currentStatement();
+      var correct = stmt && stmt.obj === type;
+      if (c && c._director && !c._director.firstObjection) {
+        c._director.firstObjection = true;
+        directorCutscene('First Objection', correct ? 'The court leans in.' : 'The room tightens around the mistake.', correct ? 'objection' : 'lost', 950);
+      }
+      setLiveState('player', 'objecting');
+      setLiveState('opp', correct ? 'annoyed' : 'confident');
+      setLiveState('judge', correct ? 'impressed' : 'annoyed');
+      return _origResolveObjectionV3.apply(this, arguments);
+    };
+  }
+
+  var _origRevealV3 = Game.resolveDramaticReveal && Game.resolveDramaticReveal.bind(Game);
+  if (_origRevealV3) {
+    Game.resolveDramaticReveal = function() {
+      var c = S.court;
+      var stmt = this.currentStatement && this.currentStatement();
+      var card = c && stmt ? c.hand.find(function(x) { return !x.used && x.id === stmt.weakness; }) : null;
+      if (card) showEvidenceMoment(card, stmt, true, 'The room narrows to one exhibit. This is the break.');
+      directorCutscene('Dramatic Reveal', card ? card.name : 'The record turns.', 'evidence', 1100);
+      setLiveState('player', 'triumphant');
+      setLiveState('opp', 'rattled');
+      setLiveState('witness', 'panicking');
+      return _origRevealV3.apply(this, arguments);
+    };
+  }
+
+  function setLiveState(who, state) {
+    var c = S.court;
+    if (!c) return;
+    if (!c._characterState) c._characterState = {};
+    c._characterState[who] = state;
+    var wrap = document.getElementById('courtCanvasWrap');
+    if (!wrap) return;
+    if (who === 'player') wrap.dataset.pstate = state;
+    if (who === 'opp') wrap.dataset.ostate = state;
+    if (who === 'witness') wrap.dataset.wstate = state;
+    if (who === 'judge') wrap.dataset.jstate = state;
+  }
+
+  function refreshLiveStatesFromMeters() {
+    var c = S.court;
+    if (!c || !c._characterState) return;
+    if (!c._stateHoldUntil || Date.now() > c._stateHoldUntil) {
+      setLiveState('player', c.player.cred < 45 ? 'pressured' : ((c.combo || 0) >= 3 ? 'focused' : 'calm'));
+      setLiveState('opp', c.opp.cred < 30 ? 'defeated' : (c.opp.cred > 105 ? 'confident' : (c.jury > 18 ? 'annoyed' : 'smug')));
+      setLiveState('witness', c.witnessConfidence < 18 ? 'broken' : (c.witnessConfidence < 38 ? 'panicking' : (c.witnessConfidence < 62 ? 'sweating' : 'composed')));
+      setLiveState('judge', c.judge < 28 ? 'angry' : (c.judge < 55 ? 'annoyed' : 'neutral'));
+    }
+    if ((c.witnessConfidence || 100) < 20 && c._director && !c._director.witnessBreak) {
+      c._director.witnessBreak = true;
+      directorCutscene('Witness Breaks', 'The story changes shape under pressure.', 'witness', 1050);
+    }
+  }
+
+  var DIRECTOR_EVENTS = [
+    {
+      id: 'judgeWarning',
+      patterns: ['judgePressure','proceduralBattle','trapCase'],
+      label: 'Judge warning',
+      run: function(c) {
+        c.judge = Math.max(0, c.judge - 7);
+        setLiveState('judge', 'angry');
+        Game.courtLog('The judge cuts in: "Foundation first, counsel. I will not let this drift." Judge -7.', 'bad');
+        directorCutscene('Judge Warning', 'The bench is losing patience.', 'lost', 900);
+      }
+    },
+    {
+      id: 'witnessHesitation',
+      patterns: ['hostileWitness','contradictionChain','standardTrial'],
+      label: 'Witness hesitation',
+      run: function(c) {
+        c.witnessConfidence = Math.max(0, c.witnessConfidence - 9);
+        c.focus = Math.min(100, (c.focus || 0) + 5);
+        setLiveState('witness', 'nervous');
+        Game.courtLog('The witness hesitates before answering. Witness -9, Focus +5.', 'good');
+      }
+    },
+    {
+      id: 'opponentInterrupts',
+      patterns: ['mediaPressure','emotionalAppeal','trapCase'],
+      label: 'Opponent interruption',
+      run: function(c) {
+        c.jury = Math.max(-50, c.jury - 4);
+        c.trapActive = Math.max(c.trapActive || 0, 1);
+        setLiveState('opp', 'confident');
+        Game.courtLog(c.opp.name + ' interrupts with a polished objection. Jury -4, legal trap armed.', 'ai');
+      }
+    },
+    {
+      id: 'assistantNote',
+      patterns: ['evidenceSuppression','proceduralBattle','contradictionChain'],
+      label: 'Assistant note',
+      run: function(c) {
+        var stmt = Game.currentStatement && Game.currentStatement();
+        if (stmt && !c.revealedWeak.includes(c.statementIdx)) c.revealedWeak.push(c.statementIdx);
+        c.focus = Math.min(100, (c.focus || 0) + 8);
+        Game.courtLog('Second chair slides over a note: "This is the hinge." Weakness revealed, Focus +8.', 'drama');
+      }
+    },
+    {
+      id: 'mediaLeak',
+      patterns: ['mediaPressure','emotionalAppeal','corruptionFinalCourt'],
+      label: 'Media leak',
+      run: function(c) {
+        var swing = c.lastResult === 'good' && c.lastSide === 'player' ? 8 : -6;
+        c.jury = Math.max(-50, Math.min(50, c.jury + swing));
+        Game.courtLog('A media alert ripples through the gallery. Jury ' + (swing > 0 ? '+' : '') + swing + '.', swing > 0 ? 'drama' : 'bad');
+      }
+    },
+    {
+      id: 'surpriseDocument',
+      patterns: ['surpriseWitness','evidenceSuppression','corruptionFinalCourt'],
+      label: 'Surprise document',
+      run: function(c) {
+        var stmt = Game.currentStatement && Game.currentStatement();
+        if (stmt && !c.revealedWeak.includes(c.statementIdx)) c.revealedWeak.push(c.statementIdx);
+        c.judge = Math.min(100, c.judge + 4);
+        Game.courtLog('A sealed document enters the record. The current weakness is now visible. Judge +4.', 'drama');
+        directorCutscene('Surprise Evidence', 'A new page changes the shape of the testimony.', 'evidence', 950);
+      }
+    }
+  ];
+
+  function maybeDirectorEvent() {
+    var c = S.court;
+    if (!c || !c._director || c.ended || c.mode !== 'campaign') return;
+    var rule = PATTERN_RULES[c._director.pattern] || PATTERN_RULES.standardTrial;
+    if (c.round < 3) return;
+    if (c._director.eventBudget <= 0) return;
+    if ((c.round - c._director.lastEventRound) < (rule.eventGap || 4)) return;
+    var pressure = 0;
+    if (c.judge < 45) pressure += 0.05;
+    if (Math.abs(c.jury) > 22) pressure += 0.04;
+    if (c.witnessConfidence < 42) pressure += 0.04;
+    if (Math.random() > (rule.eventRate || 0.12) + pressure) return;
+    var candidates = DIRECTOR_EVENTS.filter(function(ev) {
+      return !ev.patterns || ev.patterns.indexOf(c._director.pattern) >= 0 || ev.patterns.indexOf(S.caseData.sceneTheme) >= 0;
+    });
+    var ev = candidates.length ? pick(candidates) : pick(DIRECTOR_EVENTS);
+    c._director.eventBudget--;
+    c._director.lastEventRound = c.round;
+    ev.run(c);
+  }
+
+  var _origAfterTurnV3 = Game.afterPlayerTurn && Game.afterPlayerTurn.bind(Game);
+  if (_origAfterTurnV3) {
+    Game.afterPlayerTurn = function(skipOpp) {
+      var out = _origAfterTurnV3.apply(this, arguments);
+      if (S.court && !S.court.ended) {
+        maybeDirectorEvent();
+        refreshLiveStatesFromMeters();
+        updateCourtChrome();
+      }
+      return out;
+    };
+  }
+
+  var _origOpponentTurnV3 = Game.opponentTurn && Game.opponentTurn.bind(Game);
+  if (_origOpponentTurnV3) {
+    Game.opponentTurn = function() {
+      var c = S.court;
+      if (c && c._director) {
+        var p = c._director.pattern;
+        if (p === 'hostileWitness') c.witnessConfidence = Math.min(130, c.witnessConfidence + 4);
+        if (p === 'mediaPressure' && Math.random() < 0.22) c.jury = Math.max(-50, c.jury - 3);
+        if (p === 'proceduralBattle' && c.judge < 45 && Math.random() < 0.3) c.trapActive = Math.max(c.trapActive || 0, 1);
+      }
+      return _origOpponentTurnV3.apply(this, arguments);
+    };
+  }
+
+  var _origRenderCourtV3 = Game.renderCourt && Game.renderCourt.bind(Game);
+  if (_origRenderCourtV3) {
+    Game.renderCourt = function() {
+      var out = _origRenderCourtV3.apply(this, arguments);
+      refreshLiveStatesFromMeters();
+      updateCourtChrome();
+      enhanceActionButtons();
+      return out;
+    };
+  }
+
+  var _origSwitchToV3 = UI.switchTo && UI.switchTo.bind(UI);
+  if (_origSwitchToV3) {
+    UI.switchTo = function(phase) {
+      var out = _origSwitchToV3.apply(this, arguments);
+      document.body.classList.toggle('court-mode', phase === 'court');
+      if (phase === 'court') setTimeout(function() { updateCourtChrome(); enhanceActionButtons(); }, 0);
+      return out;
+    };
+  }
+
+  function updateCourtChrome() {
+    var court = document.getElementById('court');
+    var wrap = document.getElementById('courtCanvasWrap');
+    var right = document.getElementById('courtRightPanel');
+    if (!court || !wrap || !right) return;
+    var bodyPanel = document.getElementById('bodyLangPanel');
+    var leftCol = document.querySelector('.court-left-col');
+    var statementBox = document.getElementById('statementBox');
+    if (bodyPanel && leftCol && !leftCol.contains(bodyPanel)) {
+      if (statementBox && statementBox.parentNode === leftCol) leftCol.insertBefore(bodyPanel, statementBox);
+      else leftCol.appendChild(bodyPanel);
+      bodyPanel.classList.remove('hidden');
+    }
+    var cd = S.caseData || {};
+    normalizeCase(cd);
+    Object.keys(SCENE_THEMES).forEach(function(k) { court.classList.remove('scene-theme-' + k); document.body.classList.remove('scene-theme-' + k); });
+    court.classList.add('scene-theme-' + (cd.sceneTheme || 'classicCourtroom'));
+    document.body.classList.add('scene-theme-' + (cd.sceneTheme || 'classicCourtroom'));
+    if (!document.getElementById('courtSceneBanner')) {
+      var banner = document.createElement('div');
+      banner.id = 'courtSceneBanner';
+      banner.className = 'court-scene-banner';
+      wrap.appendChild(banner);
+    }
+    var theme = SCENE_THEMES[cd.sceneTheme] || SCENE_THEMES.classicCourtroom;
+    var bannerEl = document.getElementById('courtSceneBanner');
+    if (bannerEl) {
+      bannerEl.innerHTML =
+        '<span class="court-scene-pill">' + escapeHTML(theme.name) + '</span>' +
+        '<span class="court-scene-pill muted">' + escapeHTML((patternRule(cd).name || 'Trial')) + '</span>';
+    }
+    if (!document.getElementById('courtDirectorStrip')) {
+      var strip = document.createElement('div');
+      strip.id = 'courtDirectorStrip';
+      strip.className = 'court-director-strip';
+      right.insertBefore(strip, right.firstChild);
+    }
+    var c = S.court;
+    var director = document.getElementById('courtDirectorStrip');
+    if (director) {
+      var rule = patternRule(cd);
+      var path = (c && c._director && c._director.winPath) || rule.winPath;
+      director.innerHTML =
+        '<div class="court-director-main">' +
+          '<span class="court-director-name">' + escapeHTML(rule.name) + '</span>' +
+          '<span class="court-director-win">' + escapeHTML(path) + '</span>' +
+        '</div>' +
+        '<div class="court-director-hint">' + escapeHTML(rule.hint) + '</div>';
+    }
+  }
+
+  function enhanceActionButtons() {
+    var row = document.getElementById('courtActions');
+    if (!row) return;
+    Array.prototype.forEach.call(row.querySelectorAll('button'), function(btn) {
+      var t = (btn.textContent || '').toLowerCase();
+      var family = 'core';
+      if (/recess|calm|consult|second chair|save/.test(t)) family = 'recovery';
+      else if (/closing|reveal|expose|snap|power|paper trail|cold read|corporate pressure/.test(t)) family = 'finisher';
+      else if (/summon|press witness/.test(t)) family = 'witness';
+      btn.dataset.actionFamily = family;
+    });
+  }
+
+  function drawRect(ctx, x, y, w, h, color) {
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, w, h);
+  }
+
+  function strokeRect(ctx, x, y, w, h, color, width) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width || 1;
+    ctx.strokeRect(x, y, w, h);
+  }
+
+  function drawText(ctx, text, x, y, color, size, align) {
+    ctx.fillStyle = color;
+    ctx.font = (size || 8) + 'px Courier New';
+    ctx.textAlign = align || 'left';
+    ctx.fillText(text, x, y);
+    ctx.textAlign = 'left';
+  }
+
+  function drawCameras(ctx, x, y) {
+    for (var i = 0; i < 4; i++) {
+      var cx = x + i * 28;
+      drawRect(ctx, cx, y, 15, 9, '#111');
+      drawRect(ctx, cx + 12, y + 2, 10, 5, '#333');
+      drawRect(ctx, cx + 4, y + 9, 2, 22, '#222');
+      drawRect(ctx, cx - 2, y + 28, 14, 3, '#222');
+      ctx.globalAlpha = 0.16;
+      drawRect(ctx, cx + 22, y - 3, 34, 14, '#fff');
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawObservers(ctx, x, y, count, accent) {
+    for (var i = 0; i < count; i++) {
+      var ox = x + i * 22;
+      drawRect(ctx, ox, y + 12, 12, 18, '#19101f');
+      ctx.fillStyle = i % 2 ? '#c89b72' : '#e0c0a0';
+      ctx.beginPath();
+      ctx.arc(ox + 6, y + 7, 6, 0, Math.PI * 2);
+      ctx.fill();
+      drawRect(ctx, ox + 3, y + 15, 6, 13, accent || '#333');
+    }
+  }
+
+  function drawThemeScene(ctx, themeId, frame) {
+    var t = SCENE_THEMES[themeId] || SCENE_THEMES.classicCourtroom;
+    var grad = ctx.createLinearGradient(0, 0, 0, 360);
+    grad.addColorStop(0, t.wallTop);
+    grad.addColorStop(0.56, t.wallMid);
+    grad.addColorStop(1, t.floor);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 800, 360);
+
+    drawRect(ctx, 0, 250, 800, 110, t.floor);
+    drawRect(ctx, 260, 250, 280, 110, t.carpet);
+    for (var fx = 0; fx < 800; fx += themeId === 'corporateTribunal' ? 64 : 42) {
+      drawRect(ctx, fx, 250, 1, 110, 'rgba(0,0,0,0.24)');
+    }
+
+    if (themeId === 'corporateTribunal') {
+      for (var gx = 24; gx < 780; gx += 110) {
+        strokeRect(ctx, gx, 46, 86, 96, 'rgba(135,217,255,0.35)', 1);
+        drawRect(ctx, gx + 4, 50, 78, 88, 'rgba(15,36,50,0.7)');
+        drawText(ctx, 'Q' + ((gx / 110 + 2) | 0), gx + 16, 82, '#87d9ff', 8);
+        drawRect(ctx, gx + 12, 100, 54, 3, '#87d9ff');
+        drawRect(ctx, gx + 12, 112, 38, 3, '#87d9ff');
+      }
+      drawObservers(ctx, 52, 186, 5, '#22313d');
+      drawObservers(ctx, 622, 186, 5, '#22313d');
+    } else if (themeId === 'mediaCourtroom') {
+      drawCameras(ctx, 42, 150);
+      drawCameras(ctx, 620, 150);
+      for (var fl = 0; fl < 5; fl++) {
+        if ((frame + fl * 17) % 110 < 7) {
+          ctx.globalAlpha = 0.38;
+          drawRect(ctx, 70 + fl * 135, 48, 54, 28, '#fff');
+          ctx.globalAlpha = 1;
+        }
+      }
+      drawObservers(ctx, 250, 58, 10, '#2a1f3d');
+    } else if (themeId === 'emergencyNightHearing') {
+      drawRect(ctx, 42, 48, 126, 78, '#040a16');
+      strokeRect(ctx, 42, 48, 126, 78, '#73a6ff', 2);
+      ctx.fillStyle = '#d8e8ff';
+      ctx.beginPath();
+      ctx.arc(136, 70, 16, 0, Math.PI * 2);
+      ctx.fill();
+      drawRect(ctx, 640, 42, 96, 72, '#07111f');
+      strokeRect(ctx, 640, 42, 96, 72, '#73a6ff', 1);
+      ctx.globalAlpha = 0.18 + 0.05 * Math.sin(frame * 0.04);
+      drawRect(ctx, 300, 0, 200, 360, '#73a6ff');
+      ctx.globalAlpha = 1;
+    } else if (themeId === 'fashionTribunal') {
+      drawRect(ctx, 55, 54, 94, 150, '#2c1431');
+      drawText(ctx, 'DESIGN BOARD', 66, 72, '#ff7bd6', 7);
+      for (var s = 0; s < 5; s++) {
+        strokeRect(ctx, 72 + s * 13, 88 + (s % 2) * 18, 22, 34, '#ff7bd6', 1);
+      }
+      drawRect(ctx, 642, 62, 88, 148, '#2c1431');
+      drawText(ctx, 'RUNWAY', 666, 82, '#ff7bd6', 8);
+      for (var m = 0; m < 3; m++) {
+        drawRect(ctx, 668 + m * 18, 108, 6, 52, '#e8d8c8');
+        ctx.beginPath();
+        ctx.arc(671 + m * 18, 99, 7, 0, Math.PI * 2);
+        ctx.fill();
+        drawRect(ctx, 662 + m * 18, 125, 18, 28, m % 2 ? '#ff7bd6' : '#9b326e');
+      }
+    } else if (themeId === 'grandAppealsCourt') {
+      for (var col = 0; col < 5; col++) {
+        var px = 70 + col * 165;
+        drawRect(ctx, px, 34, 24, 205, '#7d7788');
+        drawRect(ctx, px - 6, 28, 36, 10, '#e6d39a');
+        drawRect(ctx, px - 5, 236, 34, 8, '#e6d39a');
+        for (var flt = 0; flt < 3; flt++) drawRect(ctx, px + 5 + flt * 6, 48, 2, 180, 'rgba(0,0,0,0.18)');
+      }
+      ctx.strokeStyle = '#e6d39a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(400, 92, 42, 0, Math.PI * 2);
+      ctx.stroke();
+      drawText(ctx, 'APPEALS', 378, 95, '#e6d39a', 7);
+    } else if (themeId === 'privateArbitrationRoom') {
+      drawRect(ctx, 170, 112, 460, 74, '#263a32');
+      strokeRect(ctx, 170, 112, 460, 74, '#a7d6b8', 2);
+      for (var glass = 0; glass < 6; glass++) {
+        drawRect(ctx, 205 + glass * 65, 128, 16, 26, 'rgba(226,255,232,0.35)');
+      }
+      drawRect(ctx, 40, 92, 46, 120, '#1e322b');
+      drawRect(ctx, 710, 92, 46, 120, '#1e322b');
+      ctx.fillStyle = '#a7d6b8';
+      ctx.beginPath(); ctx.arc(63, 82, 22, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(733, 82, 22, 0, Math.PI * 2); ctx.fill();
+    } else if (themeId === 'corruptionFinalCourt') {
+      for (var bx = 38; bx < 780; bx += 82) {
+        drawRect(ctx, bx, 52, 58, 74, '#16080b');
+        strokeRect(ctx, bx, 52, 58, 74, '#ff5656', 1);
+        drawRect(ctx, bx + 5, 57, 48, 64, 'rgba(255,86,86,0.08)');
+      }
+      drawCameras(ctx, 48, 160);
+      drawObservers(ctx, 606, 168, 6, '#2c1212');
+      drawRect(ctx, 70, 286, 90, 40, '#301010');
+      drawText(ctx, 'SEALED FILES', 78, 309, '#ff5656', 7);
+      if (frame % 90 < 8) {
+        ctx.globalAlpha = 0.22;
+        drawRect(ctx, 0, 0, 800, 360, '#ffd3a0');
+        ctx.globalAlpha = 1;
+      }
+    } else {
+      drawRect(ctx, 38, 70, 88, 52, '#2b3955');
+      strokeRect(ctx, 38, 70, 88, 52, '#1d1328', 6);
+      drawRect(ctx, 626, 70, 88, 52, '#2b3955');
+      strokeRect(ctx, 626, 70, 88, 52, '#1d1328', 6);
+      drawObservers(ctx, 54, 178, 4, '#1d1328');
+    }
+
+    for (var lx = 80; lx < 760; lx += 170) {
+      drawRect(ctx, lx, 30, 52, 7, t.light);
+      ctx.globalAlpha = 0.08;
+      ctx.fillStyle = t.light;
+      ctx.beginPath();
+      ctx.moveTo(lx - 20, 37);
+      ctx.lineTo(lx + 72, 37);
+      ctx.lineTo(lx + 120, 250);
+      ctx.lineTo(lx - 70, 250);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    drawRect(ctx, 280, 132, 240, 98, t.bench);
+    drawRect(ctx, 280, 132, 240, 7, t.accent);
+    drawRect(ctx, 300, 152, 38, 56, 'rgba(0,0,0,0.18)');
+    drawRect(ctx, 358, 152, 38, 56, 'rgba(0,0,0,0.18)');
+    drawRect(ctx, 416, 152, 38, 56, 'rgba(0,0,0,0.18)');
+    drawRect(ctx, 474, 152, 30, 56, 'rgba(0,0,0,0.18)');
+
+    drawRect(ctx, 600, 196, 90, 60, t.desk);
+    drawRect(ctx, 600, 196, 90, 5, t.accent);
+    drawRect(ctx, 180, 290, 82, 31, t.desk);
+    drawRect(ctx, 180, 290, 82, 4, t.accent);
+    drawRect(ctx, 540, 290, 82, 31, t.desk);
+    drawRect(ctx, 540, 290, 82, 4, t.accent);
+
+    drawRect(ctx, 45, 204, 130, 48, t.desk);
+    drawRect(ctx, 45, 204, 130, 4, t.accent);
+
+    drawText(ctx, t.name.toUpperCase().substring(0, 26), 18, 348, t.accent, 8);
+  }
+
+  function drawStateFx(ctx, c, frame) {
+    if (!c || !c._characterState) return;
+    var states = c._characterState;
+    function ring(x, y, color, pulse) {
+      ctx.globalAlpha = 0.28 + 0.12 * Math.sin(frame * 0.08 + (pulse || 0));
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(x, y, 38, 18, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    if (states.player === 'triumphant' || states.player === 'focused') ring(230, 254, states.player === 'triumphant' ? '#f4d058' : '#64a6ff', 0);
+    if (states.player === 'pressured' || states.player === 'shocked') ring(230, 254, '#d44a3a', 1);
+    if (states.opp === 'smug' || states.opp === 'confident') ring(590, 254, '#3af4c0', 2);
+    if (states.opp === 'rattled' || states.opp === 'annoyed' || states.opp === 'defeated') ring(590, 254, '#ff7b6b', 3);
+    if (states.witness === 'sweating' || states.witness === 'nervous' || states.witness === 'panicking' || states.witness === 'broken') {
+      for (var i = 0; i < 4; i++) {
+        ctx.globalAlpha = 0.65 - i * 0.1;
+        ctx.fillStyle = '#8bd8ff';
+        ctx.beginPath();
+        ctx.arc(650 + i * 5, 172 + ((frame + i * 13) % 30), 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+    if (states.judge === 'angry' || states.judge === 'annoyed') {
+      ctx.strokeStyle = states.judge === 'angry' ? '#ff5656' : '#f4d058';
+      ctx.lineWidth = 2;
+      for (var j = 0; j < 4; j++) {
+        ctx.beginPath();
+        ctx.moveTo(374 + j * 15, 60);
+        ctx.lineTo(370 + j * 15, 46);
+        ctx.stroke();
+      }
+    }
+  }
+
+  function drawFlashAndFloaters(ctx, canvas) {
+    if (canvas.flash > 0) {
+      ctx.fillStyle = 'rgba(244, 208, 88, ' + (canvas.flash / 14 * 0.5) + ')';
+      ctx.fillRect(0, 0, canvas.w, canvas.h);
+    }
+    for (var i = 0; i < canvas.floaters.length; i++) {
+      var f = canvas.floaters[i];
+      var alpha = f.t > 60 ? (90 - f.t) / 30 : 1;
+      ctx.font = 'bold 18px Courier New';
+      ctx.fillStyle = f.color;
+      ctx.globalAlpha = alpha;
+      ctx.textAlign = 'center';
+      ctx.fillText(f.text, f.x, f.y);
+      ctx.globalAlpha = 1;
+      ctx.textAlign = 'left';
+    }
+  }
+
+  Canvas.drawCourtroom = function() {
+    var ctx = this.ctx;
+    var c = S.court;
+    var cd = S.caseData || {};
+    var themeId = (c && c.mode === 'duel') ? 'classicCourtroom' : (cd.sceneTheme || inferScene(cd || {}));
+    var frame = this.frame || 0;
+    drawThemeScene(ctx, themeId, frame);
+
+    var jb = Math.floor(Math.sin(frame * 0.04) * 1);
+    this.drawJudge(360, 72, jb);
+    drawRect(ctx, 310, 216, 16, 8, (SCENE_THEMES[themeId] || SCENE_THEMES.classicCourtroom).desk);
+    drawRect(ctx, 470, 216, 18, 5, (SCENE_THEMES[themeId] || SCENE_THEMES.classicCourtroom).accent);
+
+    var juryColors = [PAL.hair, PAL.hair2, PAL.hair3, PAL.skinDark];
+    for (var i = 0; i < 4; i++) this.drawJuror(55 + i * 30, 178, juryColors[i % 4], i);
+
+    var wb = Math.floor(Math.sin(frame * 0.06) * 1);
+    var wState = c && c._characterState ? c._characterState.witness : '';
+    this.drawWitness(615, 151, wb, /nervous|sweating|panicking|broken/.test(wState) ? 'scared' : 'normal');
+
+    if (c) {
+      var pBob = Math.floor(Math.sin(frame * 0.08) * 1);
+      var oBob = Math.floor(Math.sin(frame * 0.08 + 2) * 1);
+      var pState = c._characterState && c._characterState.player;
+      var oState = c._characterState && c._characterState.opp;
+      var pMood = pState === 'objecting' || pState === 'triumphant' || pState === 'focused' ? 'smirk' :
+                  pState === 'shocked' || pState === 'pressured' ? 'shocked' : 'normal';
+      var oMood = oState === 'angry' || oState === 'annoyed' ? 'angry' :
+                  oState === 'rattled' || oState === 'defeated' ? 'shocked' :
+                  oState === 'smug' || oState === 'confident' ? 'smirk' : 'normal';
+      this.drawLawyer(195, 240, c.player, true, pBob, pMood);
+      this.drawLawyer(555, 240, c.opp, false, oBob, oMood);
+      ctx.font = '10px Courier New';
+      ctx.fillStyle = (SCENE_THEMES[themeId] || SCENE_THEMES.classicCourtroom).accent;
+      ctx.textAlign = 'center';
+      ctx.fillText((c.player.name || 'You').substring(0, 15), 230, 333);
+      ctx.fillText((c.opp.name || 'Opp.').substring(0, 15), 590, 333);
+      ctx.textAlign = 'left';
+      drawStateFx(ctx, c, frame);
+    }
+
+    drawFlashAndFloaters(ctx, this);
+  };
+
+  Canvas.bubble = Canvas.bubble && typeof Canvas.bubble === 'object' ? Canvas.bubble : {
+    text: '',
+    line2: '',
+    role: 'player',
+    side: 'player',
+    timer: 0,
+    maxTimer: 90,
+    bx: 230,
+    by: 215
+  };
+
+  Canvas.showBubble = function(rawText, role) {
+    if (!this.bubble || typeof this.bubble !== 'object') {
+      this.bubble = { text: '', line2: '', role: 'player', side: 'player', timer: 0, maxTimer: 90, bx: 230, by: 215 };
+    }
+    var cleaned = String(rawText || '').replace(/^[^:]{1,28}:\s*/, '').replace(/["""]/g, '').trim();
+    var words = cleaned.split(/\s+/).filter(Boolean).slice(0, 8);
+    if (!words.length) return;
+    var normalizedRole = role === 'ai' ? 'opponent' : (role || 'player');
+    var half = Math.ceil(words.length / 2);
+    this.bubble.text = words.slice(0, half).join(' ');
+    this.bubble.line2 = words.slice(half).join(' ');
+    this.bubble.role = normalizedRole;
+    this.bubble.side = normalizedRole;
+    this.bubble.maxTimer = this.bubble.maxTimer || 90;
+    this.bubble.timer = this.bubble.maxTimer;
+    this.bubble.bx = normalizedRole === 'opponent' ? 590 : normalizedRole === 'judge' ? 400 : normalizedRole === 'witness' ? 650 : 230;
+    this.bubble.by = normalizedRole === 'judge' ? 135 : normalizedRole === 'witness' ? 185 : 215;
+  };
+
+  console.log('[courtExperienceDirector_v3] Scene themes, trial director, evidence timing, live reactions, and court UI cleanup loaded.');
+})();
