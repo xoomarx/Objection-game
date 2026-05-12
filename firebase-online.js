@@ -162,7 +162,7 @@
 
     buildStyleGrid(targetId, choiceRole) {
       const grid = $(targetId);
-      if (!grid || !window.STYLES) return;
+      if (!grid || typeof STYLES === 'undefined') return;
       grid.innerHTML = '';
       Object.values(STYLES).forEach((st, index) => {
         const card = document.createElement('div');
@@ -350,7 +350,7 @@
           this.receiveDuelState(room.duelState);
         }
 
-        if (room.winner && !this.suppressSync && window.S && S.phase !== 'verdict') {
+        if (room.winner && !this.suppressSync && typeof S !== 'undefined' && S.phase !== 'verdict') {
           this.suppressSync = true;
           try { Game.endDuel(room.winner); } catch (e) {}
           this.suppressSync = false;
@@ -435,7 +435,7 @@
     },
 
     isMyTurn() {
-      return !!(window.S && S.duel && S.duel.turn === this.localPlayerNum());
+      return !!(typeof S !== 'undefined' && S.duel && S.duel.turn === this.localPlayerNum());
     },
 
     receiveDuelState(duelState) {
@@ -445,10 +445,12 @@
       this.hidePanel();
       this.suppressSync = true;
       try {
-        if (window.S) {
+        if (typeof S !== 'undefined') {
           S.player = null;
           S.caseData = null;
           S.duel = clone(duelState);
+          S.duel.online = true;
+          S.duel.localPlayer = this.localPlayerNum();
           S.court = {
             mode: 'duel',
             player: S.duel.turn === 1 ? S.duel.p1 : S.duel.p2,
@@ -461,9 +463,9 @@
             lastSide: null
           };
         }
-        if (window.Snd) { try { Snd.murmur(); } catch (e) {} }
-        if (window.UI && typeof UI.switchTo === 'function') UI.switchTo('court');
-        if (window.Game && typeof Game.renderDuel === 'function') Game.renderDuel();
+        if (typeof Snd !== 'undefined') { try { Snd.murmur(); } catch (e) {} }
+        if (typeof UI !== 'undefined' && typeof UI.switchTo === 'function') UI.switchTo('court');
+        if (typeof Game !== 'undefined' && typeof Game.renderDuel === 'function') Game.renderDuel();
       } catch (err) {
         console.warn('Could not receive online duel state:', err);
       }
@@ -471,7 +473,7 @@
     },
 
     async pushDuelState() {
-      if (!this.roomRef || this.suppressSync || !window.S || !S.duel) return;
+      if (!this.roomRef || this.suppressSync || typeof S === 'undefined' || !S.duel) return;
       const state = clone(S.duel);
       const json = JSON.stringify(state);
       this.lastStateJson = json;
@@ -484,7 +486,7 @@
     },
 
     patchGame() {
-      if (!window.Game || Game.__firebaseOnlineCompletePatch) return;
+      if (typeof Game === 'undefined' || Game.__firebaseOnlineCompletePatch) return;
       Game.__firebaseOnlineCompletePatch = true;
 
       this.original.renderDuel = Game.renderDuel ? Game.renderDuel.bind(Game) : null;
@@ -542,7 +544,7 @@
     },
 
     applyTurnLock() {
-      if (!this.roomRef || !window.S || !S.duel || S.phase !== 'court') return;
+      if (!this.roomRef || typeof S === 'undefined' || !S.duel || S.phase !== 'court') return;
       const myTurn = this.isMyTurn();
       const note = myTurn ? 'Your turn - choose an action.' : 'Waiting for your friend to move...';
       if ($('tacticTip')) $('tacticTip').textContent = note;
@@ -559,7 +561,7 @@
     },
 
     showTurnToast() {
-      if (window.UI && UI.bigCue) UI.bigCue('WAIT YOUR TURN', 700);
+      if (typeof UI !== 'undefined' && UI.bigCue) UI.bigCue('WAIT YOUR TURN', 700);
       else alert('Wait for your turn.');
     }
   };
