@@ -31,6 +31,11 @@
     return v || fallback;
   }
 
+  function safeNumber(value, fallback) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
   function makePlayerChoice(role) {
     return {
       name: role === 'host' ? 'P1' : 'P2',
@@ -48,6 +53,7 @@
     started: false,
     suppressSync: false,
     lastStateJson: '',
+    selectedCaseId: '',
     original: {},
 
     configured() {
@@ -125,6 +131,14 @@
                 <div id="firebaseGuestStatus" class="small">Waiting...</div>
               </div>
             </div>
+            <div class="firebase-case-card">
+              <div class="firebase-case-head">
+                <span>Case File</span>
+                <span id="firebaseCaseLock" class="small">Host chooses the docket</span>
+              </div>
+              <select id="firebaseCaseSelect" class="firebase-case-select"></select>
+              <div id="firebaseCasePreview" class="firebase-case-preview">Pick a case before the duel starts.</div>
+            </div>
             <p id="firebaseLobbyInfo" class="center">Waiting...</p>
             <div class="center">
               <button class="big primary hidden" id="firebaseStartDuelBtn" type="button">Start Duel</button>
@@ -152,10 +166,13 @@
       $('firebaseStartDuelBtn').addEventListener('click', () => this.requestStartDuel());
       $('firebaseHostName').addEventListener('input', () => this.updateMyChoice());
       $('firebaseGuestName').addEventListener('input', () => this.updateMyChoice());
+      const caseSelect = $('firebaseCaseSelect');
+      if (caseSelect) caseSelect.addEventListener('change', () => this.updateSelectedCase(caseSelect.value));
       panel.addEventListener('click', (e) => { if (e.target === panel) this.hidePanel(); });
 
       this.buildStyleGrid('firebaseHostStyles', 'host');
       this.buildStyleGrid('firebaseGuestStyles', 'guest');
+      this.buildCaseSelect();
 
       return panel;
     },
@@ -187,10 +204,59 @@
       const guestCanEdit = this.role === 'guest';
       const hostName = $('firebaseHostName');
       const guestName = $('firebaseGuestName');
+      const caseSelect = $('firebaseCaseSelect');
       if (hostName) hostName.disabled = !hostCanEdit;
       if (guestName) guestName.disabled = !guestCanEdit;
+      if (caseSelect) caseSelect.disabled = !hostCanEdit;
       document.querySelectorAll('#firebaseHostStyles .style-card').forEach(el => el.style.pointerEvents = hostCanEdit ? '' : 'none');
       document.querySelectorAll('#firebaseGuestStyles .style-card').forEach(el => el.style.pointerEvents = guestCanEdit ? '' : 'none');
+    },
+
+    caseList() {
+      if (typeof CASES === 'undefined' || !Array.isArray(CASES)) return [];
+      return CASES.filter(c => c && c.id && c.title && c.statements && c.statements.length);
+    },
+
+    caseById(caseId) {
+      const list = this.caseList();
+      return list.find(c => c.id === caseId) || list[0] || null;
+    },
+
+    buildCaseSelect() {
+      const select = $('firebaseCaseSelect');
+      if (!select) return;
+      const cases = this.caseList();
+      select.innerHTML = '';
+      cases.forEach((c, index) => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.title + ' (' + c.statements.length + ' statements)';
+        select.appendChild(opt);
+        if (!this.selectedCaseId && index === 0) this.selectedCaseId = c.id;
+      });
+      if (this.selectedCaseId) select.value = this.selectedCaseId;
+      this.updateCasePreview();
+    },
+
+    updateCasePreview(caseId) {
+      if (caseId) this.selectedCaseId = caseId;
+      const select = $('firebaseCaseSelect');
+      if (select && this.selectedCaseId && select.value !== this.selectedCaseId) select.value = this.selectedCaseId;
+      const preview = $('firebaseCasePreview');
+      const c = this.caseById(this.selectedCaseId);
+      if (!preview || !c) return;
+      const diff = c.diff ? 'Difficulty ' + c.diff : 'Duel case';
+      const witness = c.witness ? 'Witness: ' + c.witness.name + ' - ' + c.witness.role : 'Witness file sealed';
+      preview.textContent = diff + ' | ' + witness + ' | ' + (c.intro || 'No intro available.');
+    },
+
+    async updateSelectedCase(caseId) {
+      const picked = this.caseById(caseId);
+      if (!picked) return;
+      this.selectedCaseId = picked.id;
+      this.updateCasePreview(picked.id);
+      if (!this.roomRef || this.role !== 'host') return;
+      try { await this.roomRef.update({ selectedCaseId: picked.id }); } catch (e) {}
     },
 
     selectedStyle(choiceRole) {
@@ -241,6 +307,8 @@
       hostChoice.name = safeText(($('firebaseHostName') || {}).value, 'P1');
       hostChoice.style = this.selectedStyle('host');
       hostChoice.ready = true;
+      const pickedCase = this.caseById(this.selectedCaseId);
+      if (pickedCase) this.selectedCaseId = pickedCase.id;
 
       try {
         await this.roomRef.set({
@@ -249,6 +317,7 @@
           host: this.playerId,
           guest: null,
           choices: { host: hostChoice, guest: makePlayerChoice('guest') },
+          selectedCaseId: pickedCase ? pickedCase.id : '',
           duelState: null,
           winner: null,
           started: false,
@@ -318,6 +387,7 @@
       this.markStyle('firebaseGuestStyles', guest.style || 'strategist');
       if ($('firebaseHostStatus')) $('firebaseHostStatus').textContent = host.ready ? 'Ready' : 'Waiting';
       if ($('firebaseGuestStatus')) $('firebaseGuestStatus').textContent = room.guest ? (guest.ready ? 'Ready' : 'Choosing') : 'Waiting for guest';
+      if (room.selectedCaseId) this.updateCasePreview(room.selectedCaseId);
     },
 
     markStyle(gridId, styleId) {
@@ -363,25 +433,56 @@
       const guestChoice = (room.choices && room.choices.guest) || makePlayerChoice('guest');
       const p1Style = STYLES[hostChoice.style] || STYLES.closer || Object.values(STYLES)[0];
       const p2Style = STYLES[guestChoice.style] || STYLES.strategist || Object.values(STYLES)[1] || Object.values(STYLES)[0];
-      const pool = Object.keys(EVIDENCE || {});
+
+      // Pick a real case so both players fight over the same witness and statements.
+      const pickedCase = this.caseById(room.selectedCaseId || this.selectedCaseId);
+      const caseId = pickedCase ? pickedCase.id : null;
+      this.selectedCaseId = caseId || this.selectedCaseId;
+      const evidencePool = pickedCase && pickedCase.evidencePool && pickedCase.evidencePool.length
+        ? pickedCase.evidencePool
+        : (typeof EVIDENCE !== 'undefined' ? Object.keys(EVIDENCE || {}) : []);
+
       const dealHand = () => {
-        const shuffled = pool.slice().sort(() => Math.random() - 0.5);
-        return shuffled.slice(0, 5).map(id => ({ id, ...EVIDENCE[id], used: false }));
+        const shuffled = evidencePool.slice().sort(() => Math.random() - 0.5);
+        return shuffled.slice(0, Math.min(5, shuffled.length)).map(id => ({
+          id, ...(EVIDENCE && EVIDENCE[id] ? EVIDENCE[id] : { name: id, cost: 1, strength: 5, risk: 1, desc: '' }), used: false
+        }));
       };
+
+      // Pre-reveal 2 statement hints like local duel does
+      const stmtCount = pickedCase ? pickedCase.statements.length : 0;
+      const allIdxs = Array.from({ length: stmtCount }, (_, i) => i).sort(() => Math.random() - 0.5);
+      const revealedWeak = allIdxs.slice(0, Math.min(2, stmtCount));
+
       return {
+        active: true,
+        online: true,
+        caseId,
         turn: 1,
         ended: false,
         p1: {
           name: safeText(hostChoice.name, 'P1'), style: p1Style.id, tieColor: p1Style.tieColor, hairColor: p1Style.hairColor,
-          cred: 100, hand: dealHand(), specialUses: p1Style.special.uses
+          cred: 100, hand: dealHand(), specialUses: p1Style.special.uses, stats: p1Style.stats
         },
         p2: {
           name: safeText(guestChoice.name, 'P2'), style: p2Style.id, tieColor: p2Style.tieColor, hairColor: p2Style.hairColor,
-          cred: 100, hand: dealHand(), specialUses: p2Style.special.uses
+          cred: 100, hand: dealHand(), specialUses: p2Style.special.uses, stats: p2Style.stats
         },
         jury: 0, judge: 100, witnessConfidence: 100,
-        round: 1, maxRounds: 24,
-        recess: { 1: 2, 2: 2 }
+        round: 1, maxRounds: pickedCase ? Math.max(24, 18 + pickedCase.statements.length * 3) : 24,
+        recess: { 1: 2, 2: 2 },
+        focus: { 1: 25, 2: 25 },
+        combo: { 1: 0, 2: 0 },
+        statementIdx: 0,
+        statementsResolved: 0,
+        lastSpokenStatement: -1,
+        lastResult: null,
+        lastSide: null,
+        stmtIdx: 0,
+        stmtsResolved: 0,
+        revealedWeak,
+        p1Resolved: 0,
+        p2Resolved: 0,
       };
     },
 
@@ -392,8 +493,12 @@
         const room = snap.val() || {};
         if (!room.guest) { this.status('Your friend has not joined yet.'); return; }
         const duelState = this.makeDuelState(room);
+        // Show case title to host before starting
+        if (duelState.caseId && typeof CASES !== 'undefined') {
+          const c = CASES.find(x => x.id === duelState.caseId);
+          if (c) this.status('Starting duel — Case: <b>' + c.title + '</b>');
+        }
         await this.roomRef.update({ duelState, started: true, startedAt: Date.now(), status: 'started', winner: null });
-        this.status('Starting duel...');
         this.receiveDuelState(duelState);
       } catch (err) {
         this.status('Could not start duel: ' + (err && err.message ? err.message : err));
@@ -438,6 +543,58 @@
       return !!(typeof S !== 'undefined' && S.duel && S.duel.turn === this.localPlayerNum());
     },
 
+    normalizeDuelState(rawState) {
+      const state = clone(rawState || {});
+      const caseData = this.caseById(state.caseId);
+      const p1Style = state.p1 && state.p1.style && STYLES[state.p1.style] ? STYLES[state.p1.style] : STYLES.closer || Object.values(STYLES)[0];
+      const p2Style = state.p2 && state.p2.style && STYLES[state.p2.style] ? STYLES[state.p2.style] : STYLES.strategist || Object.values(STYLES)[1] || Object.values(STYLES)[0];
+      const stmtIdx = safeNumber(state.statementIdx != null ? state.statementIdx : state.stmtIdx, 0);
+      const resolved = safeNumber(state.statementsResolved != null ? state.statementsResolved : state.stmtsResolved, 0);
+
+      state.active = true;
+      state.online = true;
+      state.caseId = state.caseId || (caseData && caseData.id) || null;
+      state.turn = state.turn === 2 ? 2 : 1;
+      state.ended = !!state.ended;
+      state.p1 = state.p1 || {};
+      state.p2 = state.p2 || {};
+      state.p1.name = safeText(state.p1.name, 'P1');
+      state.p2.name = safeText(state.p2.name, 'P2');
+      state.p1.style = state.p1.style || p1Style.id;
+      state.p2.style = state.p2.style || p2Style.id;
+      state.p1.tieColor = state.p1.tieColor || p1Style.tieColor;
+      state.p2.tieColor = state.p2.tieColor || p2Style.tieColor;
+      state.p1.hairColor = state.p1.hairColor || p1Style.hairColor;
+      state.p2.hairColor = state.p2.hairColor || p2Style.hairColor;
+      state.p1.stats = state.p1.stats || p1Style.stats;
+      state.p2.stats = state.p2.stats || p2Style.stats;
+      state.p1.cred = safeNumber(state.p1.cred, 100);
+      state.p2.cred = safeNumber(state.p2.cred, 100);
+      state.p1.hand = Array.isArray(state.p1.hand) ? state.p1.hand : [];
+      state.p2.hand = Array.isArray(state.p2.hand) ? state.p2.hand : [];
+      state.p1.specialUses = safeNumber(state.p1.specialUses, (p1Style.special && p1Style.special.uses) || 0);
+      state.p2.specialUses = safeNumber(state.p2.specialUses, (p2Style.special && p2Style.special.uses) || 0);
+      state.jury = safeNumber(state.jury, 0);
+      state.judge = safeNumber(state.judge, 100);
+      state.witnessConfidence = safeNumber(state.witnessConfidence, 100);
+      state.round = safeNumber(state.round, 1);
+      state.maxRounds = safeNumber(state.maxRounds, caseData ? Math.max(24, 18 + caseData.statements.length * 3) : 24);
+      state.recess = state.recess || { 1: 2, 2: 2 };
+      state.focus = state.focus || { 1: 25, 2: 25 };
+      state.combo = state.combo || { 1: 0, 2: 0 };
+      state.statementIdx = stmtIdx;
+      state.statementsResolved = resolved;
+      state.stmtIdx = stmtIdx;
+      state.stmtsResolved = resolved;
+      state.revealedWeak = Array.isArray(state.revealedWeak) ? state.revealedWeak : [];
+      state.p1Resolved = safeNumber(state.p1Resolved, 0);
+      state.p2Resolved = safeNumber(state.p2Resolved, 0);
+      state.lastSpokenStatement = safeNumber(state.lastSpokenStatement, -1);
+      state.lastResult = state.lastResult || null;
+      state.lastSide = state.lastSide || null;
+      return { state, caseData };
+    },
+
     receiveDuelState(duelState) {
       const json = JSON.stringify(duelState || {});
       if (!duelState || json === this.lastStateJson) return;
@@ -445,11 +602,13 @@
       this.hidePanel();
       this.suppressSync = true;
       try {
+        const firstOnlineRender = !(typeof S !== 'undefined' && S.duel && S.duel.online && S.phase === 'court');
+        const normalized = this.normalizeDuelState(duelState);
+        const state = normalized.state;
         if (typeof S !== 'undefined') {
           S.player = null;
-          S.caseData = null;
-          S.duel = clone(duelState);
-          S.duel.online = true;
+          S.caseData = normalized.caseData;
+          S.duel = state;
           S.duel.localPlayer = this.localPlayerNum();
           S.court = {
             mode: 'duel',
@@ -463,9 +622,26 @@
             lastSide: null
           };
         }
-        if (typeof Snd !== 'undefined') { try { Snd.murmur(); } catch (e) {} }
+        const passOverlay = $('passControllerOverlay');
+        if (passOverlay) passOverlay.classList.add('hidden');
+        // Update topbar labels for online duel
+        if (typeof UI !== 'undefined') {
+          const cLabel = document.getElementById('caseLabel');
+          const pLabel = document.getElementById('playerLabel');
+          if (cLabel && S.caseData) cLabel.textContent = '🌐 Online: ' + S.caseData.title;
+          if (pLabel) pLabel.textContent = (S.duel.p1.name) + ' vs ' + (S.duel.p2.name);
+          const topbar = document.getElementById('topbar');
+          if (topbar) topbar.classList.remove('hidden');
+        }
+        if (firstOnlineRender && typeof Snd !== 'undefined') { try { Snd.stopMurmur(); Snd.gavel(); Snd.murmur(); } catch (e) {} }
         if (typeof UI !== 'undefined' && typeof UI.switchTo === 'function') UI.switchTo('court');
         if (typeof Game !== 'undefined' && typeof Game.renderDuel === 'function') Game.renderDuel();
+        if (window.ObjectionPolish && typeof window.ObjectionPolish.decorateCourtUI === 'function') {
+          window.ObjectionPolish.decorateCourtUI();
+          if (firstOnlineRender && typeof window.ObjectionPolish.showCaseIntro === 'function') {
+            window.ObjectionPolish.showCaseIntro('online-duel', true);
+          }
+        }
       } catch (err) {
         console.warn('Could not receive online duel state:', err);
       }
@@ -475,6 +651,11 @@
     async pushDuelState() {
       if (!this.roomRef || this.suppressSync || typeof S === 'undefined' || !S.duel) return;
       const state = clone(S.duel);
+      delete state.localPlayer;
+      state.online = true;
+      state.active = true;
+      state.stmtIdx = state.statementIdx != null ? state.statementIdx : state.stmtIdx;
+      state.stmtsResolved = state.statementsResolved != null ? state.statementsResolved : state.stmtsResolved;
       const json = JSON.stringify(state);
       this.lastStateJson = json;
       try { await this.roomRef.child('duelState').set(state); } catch (err) { console.warn('Duel sync failed:', err); }
@@ -492,7 +673,11 @@
       this.original.renderDuel = Game.renderDuel ? Game.renderDuel.bind(Game) : null;
       this.original.duelAction = Game.duelAction ? Game.duelAction.bind(Game) : null;
       this.original.duelPresent = Game.duelPresent ? Game.duelPresent.bind(Game) : null;
+      this.original.duelCourtAction = Game.duelCourtAction ? Game.duelCourtAction.bind(Game) : null;
+      this.original.duelCourtPresent = Game.duelCourtPresent ? Game.duelCourtPresent.bind(Game) : null;
+      this.original.duelPassTurn = Game.duelPassTurn ? Game.duelPassTurn.bind(Game) : null;
       this.original.endDuel = Game.endDuel ? Game.endDuel.bind(Game) : null;
+      this.original.endDuelMatch = Game.endDuelMatch ? Game.endDuelMatch.bind(Game) : null;
       this.original.toMenu = Game.toMenu ? Game.toMenu.bind(Game) : null;
 
       if (this.original.renderDuel) {
@@ -521,9 +706,55 @@
         };
       }
 
+      if (this.original.duelCourtAction) {
+        Game.duelCourtAction = (id) => {
+          if (this.roomRef && !this.isMyTurn()) { this.showTurnToast(); return; }
+          const out = this.original.duelCourtAction(id);
+          if (this.roomRef && id === 'd_object') this.patchObjectionChoices();
+          this.pushDuelState();
+          return out;
+        };
+      }
+
+      if (this.original.duelCourtPresent) {
+        Game.duelCourtPresent = (idx) => {
+          if (this.roomRef && !this.isMyTurn()) { this.showTurnToast(); return; }
+          const out = this.original.duelCourtPresent(idx);
+          this.pushDuelState();
+          return out;
+        };
+      }
+
+      if (this.original.duelPassTurn) {
+        Game.duelPassTurn = (...args) => {
+          if (this.roomRef && typeof S !== 'undefined' && S.duel && S.duel.online) {
+            const d = S.duel;
+            if (d.ended) return;
+            d.turn = d.turn === 1 ? 2 : 1;
+            const next = d.turn === 1 ? d.p1 : d.p2;
+            S.player = { name: next.name, style: next.style, stats: next.stats || (STYLES[next.style] && STYLES[next.style].stats), money: 0, reputation: 0, wins: 0, perks: [] };
+            const passOverlay = $('passControllerOverlay');
+            if (passOverlay) passOverlay.classList.add('hidden');
+            if (Game.renderDuelCourt) Game.renderDuelCourt();
+            else if (Game.renderDuel) Game.renderDuel();
+            this.pushDuelState();
+            return;
+          }
+          return this.original.duelPassTurn(...args);
+        };
+      }
+
       if (this.original.endDuel) {
         Game.endDuel = (winnerName) => {
           const out = this.original.endDuel(winnerName);
+          this.pushWinner(winnerName);
+          return out;
+        };
+      }
+
+      if (this.original.endDuelMatch) {
+        Game.endDuelMatch = (winnerName) => {
+          const out = this.original.endDuelMatch(winnerName);
           this.pushWinner(winnerName);
           return out;
         };
@@ -548,6 +779,7 @@
       const myTurn = this.isMyTurn();
       const note = myTurn ? 'Your turn - choose an action.' : 'Waiting for your friend to move...';
       if ($('tacticTip')) $('tacticTip').textContent = note;
+      this.updateTurnRibbon(myTurn);
       document.querySelectorAll('#courtActions button').forEach(btn => { btn.disabled = btn.disabled || !myTurn; });
       document.querySelectorAll('#evidenceRow .ev-card').forEach(card => {
         if (!myTurn) {
@@ -557,6 +789,36 @@
           card.style.pointerEvents = '';
           if (!card.classList.contains('used')) card.style.opacity = '';
         }
+      });
+    },
+
+    updateTurnRibbon(myTurn) {
+      const panel = $('courtRightPanel') || $('courtActions');
+      if (!panel || typeof S === 'undefined' || !S.duel) return;
+      let ribbon = $('onlineTurnRibbon');
+      if (!ribbon) {
+        ribbon = document.createElement('div');
+        ribbon.id = 'onlineTurnRibbon';
+        panel.insertBefore(ribbon, panel.firstChild);
+      }
+      const cur = S.duel.turn === 1 ? S.duel.p1 : S.duel.p2;
+      ribbon.className = 'online-turn-ribbon ' + (myTurn ? 'mine' : 'theirs');
+      ribbon.textContent = myTurn ? 'ONLINE TURN: YOUR MOVE' : 'ONLINE TURN: WAITING FOR ' + (cur && cur.name ? cur.name : 'OPPONENT');
+    },
+
+    patchObjectionChoices() {
+      const row = $('objectionRow');
+      if (!row) return;
+      row.querySelectorAll('[data-obj]').forEach(btn => {
+        if (btn.__firebaseOnlineWrapped) return;
+        const originalClick = btn.onclick;
+        btn.__firebaseOnlineWrapped = true;
+        btn.onclick = (event) => {
+          if (this.roomRef && !this.isMyTurn()) { this.showTurnToast(); return; }
+          const out = originalClick ? originalClick.call(btn, event) : undefined;
+          this.pushDuelState();
+          return out;
+        };
       });
     },
 

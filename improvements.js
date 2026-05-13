@@ -6936,3 +6936,187 @@
 
   console.log('[courtExperienceDirector_v3] Scene themes, trial director, evidence timing, live reactions, and court UI cleanup loaded.');
 })();
+
+/* ============================================================
+ * FINAL POLISH LAYER
+ * Small, non-destructive UI/gameplay glue for the newer duel
+ * engine and Firebase online flow.
+ * ============================================================ */
+(function finalPolishLayer() {
+  if (typeof Game === 'undefined') return;
+
+  var shownIntros = {};
+
+  function text(el, value) {
+    if (el) el.textContent = value == null ? '' : String(value);
+  }
+
+  function currentDuelPlayer() {
+    if (!S || !S.duel) return null;
+    return S.duel.turn === 1 ? S.duel.p1 : S.duel.p2;
+  }
+
+  function currentDuelOpponent() {
+    if (!S || !S.duel) return null;
+    return S.duel.turn === 1 ? S.duel.p2 : S.duel.p1;
+  }
+
+  function classifyCourtActions() {
+    var row = document.getElementById('courtActions');
+    if (!row) return;
+    Array.prototype.forEach.call(row.querySelectorAll('button'), function(btn) {
+      var t = (btn.textContent || '').toLowerCase();
+      var family = 'core';
+      if (/pressure|object|cross|argument/.test(t)) family = 'attack';
+      if (/calm|recess|consult|read the room|composure|notes/.test(t)) family = 'recovery';
+      if (/closing|reveal|expose|pin|power suit|paper trail|cold read|corporate/.test(t)) family = 'finisher';
+      if (/witness|summon/.test(t)) family = 'witness';
+      btn.dataset.actionFamily = family;
+    });
+  }
+
+  function ensureDuelTurnPanel() {
+    var tactics = document.querySelector('.court-tactics');
+    if (!tactics || !S || !S.duel) return null;
+    var panel = document.getElementById('duelTurnPanel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'duelTurnPanel';
+      panel.className = 'duel-turn-panel';
+      tactics.parentNode.insertBefore(panel, tactics);
+    }
+    return panel;
+  }
+
+  function decorateCourtUI() {
+    classifyCourtActions();
+    var panel = ensureDuelTurnPanel();
+    if (!panel || !S || !S.duel) return;
+    var cur = currentDuelPlayer();
+    var opp = currentDuelOpponent();
+    var total = S.caseData && S.caseData.statements ? S.caseData.statements.length : 0;
+    var idx = S.duel.statementIdx != null ? S.duel.statementIdx : (S.duel.stmtIdx || 0);
+    var resolved = S.duel.statementsResolved != null ? S.duel.statementsResolved : (S.duel.stmtsResolved || 0);
+    var focus = S.duel.focus && S.duel.focus[S.duel.turn] != null ? S.duel.focus[S.duel.turn] : null;
+    var online = !!S.duel.online;
+    panel.className = 'duel-turn-panel ' + (S.duel.turn === 1 ? 'defense' : 'prosecution') + (online ? ' online' : '');
+    panel.innerHTML = '';
+
+    var left = document.createElement('div');
+    left.className = 'duel-turn-main';
+    var title = document.createElement('span');
+    title.className = 'duel-turn-title';
+    text(title, (online ? 'Online Duel' : 'Local Duel') + ' - ' + (S.duel.turn === 1 ? 'Defense' : 'Prosecution'));
+    var names = document.createElement('span');
+    names.className = 'duel-turn-names';
+    text(names, (cur ? cur.name : 'Player') + ' vs ' + (opp ? opp.name : 'Opponent'));
+    left.appendChild(title);
+    left.appendChild(names);
+
+    var right = document.createElement('div');
+    right.className = 'duel-turn-stats';
+    var caseLine = document.createElement('span');
+    text(caseLine, S.caseData ? S.caseData.title : 'Case file loading');
+    var stmtLine = document.createElement('span');
+    text(stmtLine, total ? ('Statement ' + Math.min(idx + 1, total) + '/' + total + ' - Broken ' + resolved) : 'Statements ready');
+    var focusLine = document.createElement('span');
+    text(focusLine, focus == null ? ('Round ' + (S.duel.round || 1)) : ('Focus ' + Math.round(focus) + ' - Round ' + (S.duel.round || 1)));
+    right.appendChild(caseLine);
+    right.appendChild(stmtLine);
+    right.appendChild(focusLine);
+
+    panel.appendChild(left);
+    panel.appendChild(right);
+  }
+
+  function showCaseIntro(label, force) {
+    var cd = S && S.caseData;
+    if (!cd) return;
+    var key = (label || 'case') + ':' + (cd.id || cd.title || 'unknown');
+    if (!force && shownIntros[key]) return;
+    shownIntros[key] = true;
+
+    var overlay = document.getElementById('cutsceneOverlay');
+    var icon = document.getElementById('cutsceneIcon');
+    var title = document.getElementById('cutsceneTitle');
+    var subtitle = document.getElementById('cutsceneSubtitle');
+    if (!overlay || !title || !subtitle) return;
+    text(icon, 'CASE');
+    text(title, cd.title || 'Case File');
+    var witness = cd.witness ? 'Witness: ' + cd.witness.name + ' - ' + cd.witness.role : 'Witness file sealed';
+    text(subtitle, witness + '. ' + (cd.intro || 'The court is now in session.'));
+    overlay.classList.remove('hidden');
+    overlay.classList.add('case-intro-active');
+    setTimeout(function() {
+      overlay.classList.remove('case-intro-active');
+      overlay.classList.add('hidden');
+    }, 1450);
+  }
+
+  function verdictFanfare(kind) {
+    var verdict = document.getElementById('verdict');
+    if (!verdict) return;
+    var old = document.querySelector('.verdict-fanfare');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    var fanfare = document.createElement('div');
+    fanfare.className = 'verdict-fanfare ' + (kind || 'neutral');
+    for (var i = 0; i < 18; i++) {
+      var p = document.createElement('i');
+      p.style.setProperty('--x', (Math.cos(i / 18 * Math.PI * 2) * (70 + (i % 4) * 18)).toFixed(1) + 'px');
+      p.style.setProperty('--y', (Math.sin(i / 18 * Math.PI * 2) * (50 + (i % 5) * 14)).toFixed(1) + 'px');
+      p.style.animationDelay = (i * 18) + 'ms';
+      fanfare.appendChild(p);
+    }
+    verdict.appendChild(fanfare);
+    verdict.classList.remove('verdict-won', 'verdict-lost', 'verdict-neutral');
+    verdict.classList.add(kind === 'won' ? 'verdict-won' : kind === 'lost' ? 'verdict-lost' : 'verdict-neutral');
+    setTimeout(function() { if (fanfare.parentNode) fanfare.parentNode.removeChild(fanfare); }, 1200);
+  }
+
+  var origStartDuel = Game.startDuel && Game.startDuel.bind(Game);
+  if (origStartDuel) {
+    Game.startDuel = function() {
+      var out = origStartDuel.apply(this, arguments);
+      setTimeout(function() {
+        showCaseIntro('local-duel', true);
+        decorateCourtUI();
+      }, 80);
+      return out;
+    };
+  }
+
+  var origRenderDuelCourt = Game.renderDuelCourt && Game.renderDuelCourt.bind(Game);
+  if (origRenderDuelCourt) {
+    Game.renderDuelCourt = function() {
+      var out = origRenderDuelCourt.apply(this, arguments);
+      decorateCourtUI();
+      return out;
+    };
+  }
+
+  var origEndDuelMatch = Game.endDuelMatch && Game.endDuelMatch.bind(Game);
+  if (origEndDuelMatch) {
+    Game.endDuelMatch = function(winnerName) {
+      var out = origEndDuelMatch.apply(this, arguments);
+      verdictFanfare(winnerName === 'hung' ? 'neutral' : 'won');
+      return out;
+    };
+  }
+
+  var origEndCasePolish = Game.endCase && Game.endCase.bind(Game);
+  if (origEndCasePolish) {
+    Game.endCase = function(outcome, settlementAmt) {
+      var out = origEndCasePolish.apply(this, arguments);
+      verdictFanfare(outcome === 'won' || outcome === 'settle' ? 'won' : outcome === 'lost' ? 'lost' : 'neutral');
+      return out;
+    };
+  }
+
+  window.ObjectionPolish = {
+    decorateCourtUI: decorateCourtUI,
+    showCaseIntro: showCaseIntro,
+    verdictFanfare: verdictFanfare
+  };
+
+  console.log('[finalPolishLayer] Duel HUD, case intros, action colors, and verdict fanfare loaded.');
+})();
