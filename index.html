@@ -29,14 +29,51 @@
       <div class="seal-gavel">⚖</div>
     </div>
     <div class="menu-hero">
-      <div class="pixel-lawyer hero-left"></div>
+      <div class="pixel-lawyer-css hero-left">
+        <div class="plc-glow"></div>
+        <div class="plc-hair"></div>
+        <div class="plc-head">
+          <div class="plc-brow-l"></div><div class="plc-brow-r"></div>
+          <div class="plc-eye-l"></div><div class="plc-eye-r"></div>
+          <div class="plc-mouth determined"></div>
+        </div>
+        <div class="plc-neck"></div>
+        <div class="plc-shoulders"></div>
+        <div class="plc-body">
+          <div class="plc-lapel-l"></div><div class="plc-lapel-r"></div>
+          <div class="plc-tie" style="--tie:#c9391e"></div>
+          <div class="plc-pocket"></div>
+        </div>
+        <div class="plc-arm-l"><div class="plc-hand-l"></div></div>
+        <div class="plc-arm-r raised"><div class="plc-hand-r"></div></div>
+        <div class="plc-pants"></div>
+        <div class="plc-shoes"><div class="plc-shoe-l"></div><div class="plc-shoe-r"></div></div>
+      </div>
       <div class="title-box">
         <div class="case-stamp" data-en="LAWYER VS LAWYER">LAWYER VS LAWYER</div>
         <h1 class="menu-title-objection">OBJECTION!</h1>
         <h2 class="menu-title-powsuit">POWER SUIT</h2>
         <p class="tag" data-en-html="A pixel courtroom drama">A pixel courtroom drama</p>
       </div>
-      <div class="pixel-lawyer hero-right"></div>
+      <div class="pixel-lawyer-css hero-right">
+        <div class="plc-glow opp"></div>
+        <div class="plc-hair dark"></div>
+        <div class="plc-head dark-skin">
+          <div class="plc-brow-l raised-brow"></div><div class="plc-brow-r raised-brow"></div>
+          <div class="plc-eye-l half-lid"></div><div class="plc-eye-r half-lid"></div>
+          <div class="plc-mouth smug"></div>
+        </div>
+        <div class="plc-neck dark-skin"></div>
+        <div class="plc-shoulders dark-suit"></div>
+        <div class="plc-body dark-suit">
+          <div class="plc-lapel-l dark"></div><div class="plc-lapel-r dark"></div>
+          <div class="plc-tie" style="--tie:#1a1a8e"></div>
+        </div>
+        <div class="plc-arm-l crossed"><div class="plc-hand-l dark-skin"></div></div>
+        <div class="plc-arm-r crossed-r"><div class="plc-hand-r dark-skin"></div></div>
+        <div class="plc-pants dark-pants"></div>
+        <div class="plc-shoes"><div class="plc-shoe-l"></div><div class="plc-shoe-r"></div></div>
+      </div>
     </div>
     <div class="menu-dossier">
       <p data-en-html="&lt;b&gt;Main Goal:&lt;/b&gt; Win stylish courtroom fights with evidence, objections, cross-examination, and closing arguments."><b>Main Goal:</b> Win stylish courtroom fights with evidence, objections, cross-examination, and closing arguments.</p>
@@ -45,6 +82,40 @@
         <div data-en="• Build Focus, chain Combos, then land a Dramatic Reveal.">• Build Focus, chain Combos, then land a Dramatic Reveal.</div>
         <div data-en="• Use Second Chair Save when Adrenaline peaks.">• Use Second Chair Save when Adrenaline peaks.</div>
         <div data-en="• Win cases to unlock career perks and harder trials.">• Win cases to unlock career perks and harder trials.</div>
+      </div>
+    </div>
+    <div class="menu-mode-cards">
+      <div class="mode-card mode-campaign" data-act="campaign">
+        <div class="mode-card-icon">⚖</div>
+        <div class="mode-card-body">
+          <div class="mode-card-title">Campaign</div>
+          <div class="mode-card-desc">Solve 18 layered mysteries solo</div>
+        </div>
+        <div class="mode-card-arrow">→</div>
+      </div>
+      <div class="mode-card mode-duel" id="modeCardOnline" onclick="document.getElementById('onlineDuelBtn').click()">
+        <div class="mode-card-icon">🌐</div>
+        <div class="mode-card-body">
+          <div class="mode-card-title">Online Duel</div>
+          <div class="mode-card-desc">Fight a real opponent in court</div>
+        </div>
+        <div class="mode-card-arrow">→</div>
+      </div>
+      <div class="mode-card mode-local" data-act="duel">
+        <div class="mode-card-icon">⚔</div>
+        <div class="mode-card-body">
+          <div class="mode-card-title">Local Duel</div>
+          <div class="mode-card-desc">Hot-seat two-player battle</div>
+        </div>
+        <div class="mode-card-arrow">→</div>
+      </div>
+      <div class="mode-card mode-daily" data-act="random-case">
+        <div class="mode-card-icon">📅</div>
+        <div class="mode-card-body">
+          <div class="mode-card-title" id="dailyCaseLabel">Daily Case</div>
+          <div class="mode-card-desc" id="dailyCaseDesc">A fresh mystery each day</div>
+        </div>
+        <div class="mode-card-arrow">→</div>
       </div>
     </div>
     <div class="difficulty-panel" id="difficultyPanel">
@@ -175,6 +246,65 @@
         <div id="courtCanvasWrap">
           <canvas id="courtCanvas" width="800" height="360"></canvas>
           <div id="bigCue" class="big-cue hidden"></div>
+          <div id="character-stage">
+            <div class="char-slot slot-judge">
+              <div class="char judge-char state-neutral" id="charJudge">
+                <div class="c-glow judge-glow"></div>
+                <div class="c-hair"></div>
+                <div class="c-head"><div class="c-brow-l"></div><div class="c-brow-r"></div><div class="c-eye-l"></div><div class="c-eye-r"></div><div class="c-mouth"></div></div>
+                <div class="c-neck"></div>
+                <div class="c-shoulders robe"></div>
+                <div class="c-body robe"><div class="c-lapel-l robe-l"></div><div class="c-lapel-r robe-r"></div></div>
+                <div class="c-arm-l"><div class="c-hand-l"></div></div>
+                <div class="c-arm-r gavel-hand"><div class="c-hand-r"></div></div>
+              </div>
+              <div class="char-label">JUDGE</div>
+            </div>
+            <div class="char-slot slot-witness">
+              <div class="char witness-char state-composed" id="charWitness">
+                <div class="c-glow witness-glow"></div>
+                <div class="c-hair"></div>
+                <div class="c-head"><div class="c-brow-l"></div><div class="c-brow-r"></div><div class="c-eye-l"></div><div class="c-eye-r"></div><div class="c-mouth"></div></div>
+                <div class="c-neck"></div>
+                <div class="c-shoulders"></div>
+                <div class="c-body"><div class="c-lapel-l"></div><div class="c-lapel-r"></div><div class="c-tie"></div></div>
+                <div class="c-arm-l"><div class="c-hand-l"></div></div>
+                <div class="c-arm-r"><div class="c-hand-r"></div></div>
+                <div class="c-sweat"></div>
+              </div>
+              <div class="char-label">WITNESS</div>
+            </div>
+            <div class="char-slot slot-player">
+              <div class="char player-char state-calm" id="charPlayer">
+                <div class="c-glow player-glow"></div>
+                <div class="c-hair"></div>
+                <div class="c-head"><div class="c-brow-l"></div><div class="c-brow-r"></div><div class="c-eye-l"></div><div class="c-eye-r"></div><div class="c-mouth"></div></div>
+                <div class="c-neck"></div>
+                <div class="c-shoulders"></div>
+                <div class="c-body"><div class="c-lapel-l"></div><div class="c-lapel-r"></div><div class="c-tie"></div><div class="c-pocket"></div></div>
+                <div class="c-arm-l"><div class="c-hand-l"></div></div>
+                <div class="c-arm-r"><div class="c-hand-r"></div></div>
+                <div class="c-pants"></div>
+                <div class="c-shoe-l"></div><div class="c-shoe-r"></div>
+              </div>
+              <div class="char-label" id="charPlayerLabel">YOU</div>
+            </div>
+            <div class="char-slot slot-opponent">
+              <div class="char opponent-char state-smug" id="charOpponent">
+                <div class="c-glow opp-glow"></div>
+                <div class="c-hair dark"></div>
+                <div class="c-head"><div class="c-brow-l"></div><div class="c-brow-r"></div><div class="c-eye-l half-lid"></div><div class="c-eye-r half-lid"></div><div class="c-mouth smug"></div></div>
+                <div class="c-neck dark-skin"></div>
+                <div class="c-shoulders dark-suit"></div>
+                <div class="c-body dark-suit"><div class="c-lapel-l dark"></div><div class="c-lapel-r dark"></div><div class="c-tie opp-tie"></div></div>
+                <div class="c-arm-l crossed"><div class="c-hand-l dark-skin"></div></div>
+                <div class="c-arm-r crossed-r"><div class="c-hand-r dark-skin"></div></div>
+                <div class="c-pants dark-pants"></div>
+                <div class="c-shoe-l"></div><div class="c-shoe-r"></div>
+              </div>
+              <div class="char-label" id="charOppLabel">OPP.</div>
+            </div>
+          </div>
         </div>
 
         <div id="statementBox" class="statement">
@@ -359,6 +489,11 @@
   <div id="bodyLangPanel" class="body-lang-panel hidden">
     <div id="playerBodyLang" class="body-lang-badge player-side"></div>
     <div id="oppBodyLang" class="body-lang-badge opp-side"></div>
+  </div>
+
+  <div id="toast-container"></div>
+  <div id="phase-banner" class="hidden">
+    <div class="phase-banner-text"></div>
   </div>
 
 </div>
