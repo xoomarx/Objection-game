@@ -1814,10 +1814,10 @@
 
   const _origToMenuPreserve = Game.toMenu.bind(Game);
   Game.toMenu = function () {
-    if (S.player) _preservedPlayer = S.player;
+    if (S.player && !S.player.duelTemp) _preservedPlayer = S.player;
     _origToMenuPreserve();
     // Restore player so The Chambers and topbar still work
-    if (_preservedPlayer) {
+    if (_preservedPlayer && !_preservedPlayer.duelTemp) {
       S.player = _preservedPlayer;
       // Refresh topbar with career info
       try {
@@ -2948,7 +2948,7 @@
       ? pool.slice(HAND_SIZE, HAND_SIZE * 2)
       : pool.slice().sort(function () { return Math.random() - 0.5; }).slice(0, HAND_SIZE));
 
-    S.player = { name: p1Name, style: p1StyleId, stats: p1Style.stats, money: 0, reputation: 0, wins: 0, perks: [] };
+    S.player = { name: p1Name, style: p1StyleId, stats: p1Style.stats, money: 0, reputation: 0, wins: 0, perks: [], duelTemp: true };
 
     Snd.stopMurmur && Snd.stopMurmur();
     Snd.gavel && Snd.gavel();
@@ -2998,7 +2998,7 @@
     const cur = d.turn === 1 ? d.p1 : d.p2;
     const oth = d.turn === 1 ? d.p2 : d.p1;
 
-    S.player = { name: cur.name, style: cur.style, stats: cur.stats, money: 0, reputation: 0, wins: 0, perks: [] };
+    S.player = { name: cur.name, style: cur.style, stats: cur.stats, money: 0, reputation: 0, wins: 0, perks: [], duelTemp: true };
     S.court.player = cur;
     S.court.opp = { name: oth.name, tieColor: oth.tieColor, hairColor: oth.hairColor, personality: 'neutral' };
     S.court.witnessConfidence = d.witnessConfidence;
@@ -3420,12 +3420,12 @@
       if (btn) btn.onclick = function () {
         overlay.classList.add('hidden');
         d.turn = nextTurn;
-        S.player = { name: nextPlayer.name, style: nextPlayer.style, stats: nextPlayer.stats, money: 0, reputation: 0, wins: 0, perks: [] };
+        S.player = { name: nextPlayer.name, style: nextPlayer.style, stats: nextPlayer.stats, money: 0, reputation: 0, wins: 0, perks: [], duelTemp: true };
         self.renderDuelCourt();
       };
     } else {
       d.turn = nextTurn;
-      S.player = { name: nextPlayer.name, style: nextPlayer.style, stats: nextPlayer.stats, money: 0, reputation: 0, wins: 0, perks: [] };
+      S.player = { name: nextPlayer.name, style: nextPlayer.style, stats: nextPlayer.stats, money: 0, reputation: 0, wins: 0, perks: [], duelTemp: true };
       this.renderDuelCourt();
     }
   };
@@ -7204,14 +7204,15 @@ function showPhaseBanner(text, durationMs) {
 // ── Wire scene theme to case loading ────────────────────────────
 (function() {
   var _tryPatchCaseStart = function() {
-    if (typeof window.Game !== 'undefined' && typeof window.Game.startCase === 'function') {
-      var _orig = window.Game.startCase.bind(window.Game);
-      window.Game.startCase = function(caseData) {
-        if (caseData && caseData.sceneTheme) {
-          setSceneTheme(caseData.sceneTheme);
-        }
+    if (typeof Game !== 'undefined' && typeof Game.startCase === 'function' && !Game._sceneThemeStartPatched) {
+      Game._sceneThemeStartPatched = true;
+      var _orig = Game.startCase;
+      Game.startCase = function(idx) {
+        var out = _orig.apply(this, arguments);
+        var caseData = (typeof S !== 'undefined' && S.caseData) || (typeof CASES !== 'undefined' ? CASES[idx] : null);
+        setSceneTheme(caseData && caseData.sceneTheme ? caseData.sceneTheme : 'scene-classic');
         resetCharStates();
-        _orig(caseData);
+        return out;
       };
     }
   };
@@ -7222,20 +7223,25 @@ function showPhaseBanner(text, durationMs) {
 // ── Wire court actions to character states ───────────────────────
 (function() {
   var _tryPatchCourtLog = function() {
-    if (typeof window.addCourtLog === 'function') {
-      var _orig = window.addCourtLog;
-      window.addCourtLog = function(text, cls) {
-        _orig(text, cls);
+    if (typeof Game !== 'undefined' && typeof Game.courtLog === 'function' && !Game._characterCourtLogPatched) {
+      Game._characterCourtLogPatched = true;
+      var _orig = Game.courtLog.bind(Game);
+      Game.courtLog = function(text, cls) {
+        var out = _orig(text, cls);
         _reactToLog(text, cls);
+        return out;
       };
     }
-    document.addEventListener('courtAction', function(e) {
-      if (!e.detail) return;
-      var action = e.detail.action;
-      var result = e.detail.result;
-      var success = e.detail.success;
-      _handleCourtActionVisuals(action, result, success);
-    });
+    if (!document.__characterCourtActionPatched) {
+      document.__characterCourtActionPatched = true;
+      document.addEventListener('courtAction', function(e) {
+        if (!e.detail) return;
+        var action = e.detail.action;
+        var result = e.detail.result;
+        var success = e.detail.success;
+        _handleCourtActionVisuals(action, result, success);
+      });
+    }
   };
 
   function _reactToLog(text, cls) {
@@ -7292,6 +7298,10 @@ document.addEventListener('DOMContentLoaded', function() {
     card.addEventListener('click', function() {
       var act = card.getAttribute('data-act');
       if (!act) return;
+      if (act === 'daily-case' && typeof Game !== 'undefined' && typeof Game.startDailyCase === 'function') {
+        Game.startDailyCase();
+        return;
+      }
       var btn = document.querySelector('button[data-act="' + act + '"]');
       if (btn && btn !== card) btn.click();
     });
@@ -7313,13 +7323,15 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 300);
 
   // Show phase banners on screen transitions
-  var _origShow = window.showScreen;
-  if (typeof _origShow === 'function') {
-    window.showScreen = function(id) {
-      _origShow(id);
+  if (typeof UI !== 'undefined' && typeof UI.switchTo === 'function' && !UI._phaseBannerPatched) {
+    UI._phaseBannerPatched = true;
+    var _origSwitchTo = UI.switchTo.bind(UI);
+    UI.switchTo = function(id) {
+      var out = _origSwitchTo(id);
       if (id === 'court') showPhaseBanner('COURT IN SESSION', 1400);
       else if (id === 'investigation') showPhaseBanner('INVESTIGATION', 1200);
       else if (id === 'negotiation') showPhaseBanner('SETTLEMENT TALKS', 1200);
+      return out;
     };
   }
 });
